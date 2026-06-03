@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 import csv
-import json
-import urllib.error
-import urllib.request
 from pathlib import Path
 from typing import Iterable
 
@@ -87,32 +84,3 @@ def print_csv_table(path: Path = DB_RESULT_PATH, limit: int | None = None) -> No
     print(separator_line)
     for row in rows:
         print(" | ".join(row.get(header, "").ljust(widths[header]) for header in headers))
-
-
-def fetch_lotto_draw(round_no: int) -> dict[str, str] | None:
-    url = f"https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo={round_no}"
-    request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-
-    try:
-        with urllib.request.urlopen(request, timeout=15) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
-        return None
-
-    if payload.get("returnValue") != "success":
-        return None
-
-    return {
-        "Round": str(payload["drwNo"]),
-        "No1": str(payload["drwtNo1"]),
-        "No2": str(payload["drwtNo2"]),
-        "No3": str(payload["drwtNo3"]),
-        "No4": str(payload["drwtNo4"]),
-        "No5": str(payload["drwtNo5"]),
-        "No6": str(payload["drwtNo6"]),
-        "Bonus": str(payload["bnusNo"]),
-        "FirstPrize": str(payload["firstWinamnt"]),
-        "FirstWinners": str(payload["firstPrzwnerCo"]),
-        "SecondPrize": str(payload["secondWinamnt"]),
-        "SecondWinners": str(payload["secondPrzwnerCo"]),
-    }
