@@ -55,6 +55,9 @@ def fetch_lotto_draw(round_no: int) -> dict[str, str] | None:
         "FirstWinners": str(item["rnk1WnNope"]),
         "SecondPrize": str(item["rnk2WnAmt"]),
         "SecondWinners": str(item["rnk2WnNope"]),
+        "ThirdWinners": str(item["rnk3WnNope"]),
+        "FourthWinners": str(item["rnk4WnNope"]),
+        "FifthWinners": str(item["rnk5WnNope"]),
     }
 
 
@@ -137,20 +140,26 @@ def crawl_new_results(csv_path=DB_RESULT_PATH) -> int:
 
 
 def crawl_results_in_range(start_round: int, end_round: int, csv_path=DB_RESULT_PATH) -> int:
+    # 입력한 시작/종료 회차의 유효성을 먼저 확인한다.
     if start_round > end_round:
         raise ValueError("start_round must be less than or equal to end_round")
 
+    # 기존 CSV를 읽고, 이번 실행에서 수집된 행과 누락 회차를 분리 저장한다.
     existing_rows = read_csv_rows(csv_path)
     crawled_rows: list[dict[str, str]] = []
     missing_rounds: list[int] = []
 
+    # 지정된 회차 범위를 순회하며 각 회차 당첨 정보를 조회한다.
     for round_no in range(start_round, end_round + 1):
         draw = fetch_lotto_draw(round_no)
         if draw is None:
+            # 해당 회차 데이터가 없으면 누락 목록에 기록한다.
             missing_rounds.append(round_no)
             continue
+        # 조회에 성공한 회차만 저장 전 출력/병합 대상으로 모은다.
         crawled_rows.append(draw)
 
+    # 사용자 확인을 위해 크롤링 대상 범위와 수집 결과를 먼저 출력한다.
     print(f"Crawl target range: {start_round} to {end_round}")
     if crawled_rows:
         print("Crawled rows before saving:")
@@ -158,9 +167,11 @@ def crawl_results_in_range(start_round: int, end_round: int, csv_path=DB_RESULT_
     else:
         print("No rows found in the requested range.")
 
+    # 누락된 회차가 있으면 별도로 안내한다.
     if missing_rounds:
         print("Missing round data:", ", ".join(str(round_no) for round_no in missing_rounds))
 
+    # 수집된 데이터가 없으면 CSV 갱신 없이 종료한다.
     if not crawled_rows:
         return 0
 

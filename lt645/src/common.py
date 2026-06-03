@@ -55,8 +55,18 @@ def write_csv_rows(rows: Iterable[dict[str, str]], path: Path = DB_RESULT_PATH) 
         path.write_text("", encoding="utf-8")
         return 0
 
+    # 첫 행만 기준으로 헤더를 만들면 신규 컬럼이 누락될 수 있으므로,
+    # 전체 행을 순회하며 등장한 키를 순서대로 수집해 헤더를 구성한다.
+    fieldnames: list[str] = []
+    seen: set[str] = set()
+    for row in row_list:
+        for key in row.keys():
+            if key not in seen:
+                seen.add(key)
+                fieldnames.append(key)
+
     with path.open("w", encoding="utf-8", newline="") as csv_file:
-        writer = csv.DictWriter(csv_file, fieldnames=list(row_list[0].keys()))
+        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(row_list)
 
