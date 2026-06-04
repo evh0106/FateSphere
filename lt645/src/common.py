@@ -8,6 +8,7 @@ from typing import Iterable
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DOCS_RESULT_PATH = PROJECT_ROOT / "docs" / "result.md"
 DB_RESULT_PATH = PROJECT_ROOT / "db" / "result.csv"
+DB_EXCLUDED_COMBINATIONS_PATH = PROJECT_ROOT / "db" / "excluded_combinations.csv"
 
 
 def parse_markdown_table(text: str) -> list[dict[str, str]]:
@@ -55,15 +56,37 @@ def write_csv_rows(rows: Iterable[dict[str, str]], path: Path = DB_RESULT_PATH) 
         path.write_text("", encoding="utf-8")
         return 0
 
-    # 첫 행만 기준으로 헤더를 만들면 신규 컬럼이 누락될 수 있으므로,
-    # 전체 행을 순회하며 등장한 키를 순서대로 수집해 헤더를 구성한다.
-    fieldnames: list[str] = []
+    # 전체 행에서 키를 수집하고, 알려진 컬럼은 고정 순서로 정렬한다.
+    discovered: list[str] = []
     seen: set[str] = set()
     for row in row_list:
         for key in row.keys():
             if key not in seen:
                 seen.add(key)
-                fieldnames.append(key)
+                discovered.append(key)
+
+    preferred_order = [
+        "Round",
+        "No1",
+        "No2",
+        "No3",
+        "No4",
+        "No5",
+        "No6",
+        "Bonus",
+        "FirstPrize",
+        "FirstWinners",
+        "SecondPrize",
+        "SecondWinners",
+        "ThirdPrize",
+        "ThirdWinners",
+        "FourthWinners",
+        "FifthWinners",
+    ]
+
+    ordered_known = [key for key in preferred_order if key in seen]
+    ordered_extra = [key for key in discovered if key not in preferred_order]
+    fieldnames = ordered_known + ordered_extra
 
     with path.open("w", encoding="utf-8", newline="") as csv_file:
         writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
@@ -73,14 +96,50 @@ def write_csv_rows(rows: Iterable[dict[str, str]], path: Path = DB_RESULT_PATH) 
     return len(row_list)
 
 
-def print_csv_table(path: Path = DB_RESULT_PATH, limit: int | None = None) -> None:
+def print_csv_table(
+    path: Path = DB_RESULT_PATH,
+    limit: int | None = None,
+    start_round: int | None = None,
+    end_round: int | None = None,
+    latest: bool = False,
+    sort_desc: bool = False,
+) -> None:
     rows = read_csv_rows(path)
     if not rows:
         print(f"No CSV data found at {path}")
         return
 
+    if start_round is not None or end_round is not None:
+        filtered_rows: list[dict[str, str]] = []
+        for row in rows:
+            try:
+                round_no = int(row.get("Round", 0))
+            except ValueError:
+                continue
+
+            if start_round is not None and round_no < start_round:
+                continue
+            if end_round is not None and round_no > end_round:
+                continue
+            filtered_rows.append(row)
+        rows = filtered_rows
+
+    if sort_desc:
+        try:
+            rows.sort(key=lambda row: int(row.get("Round", 0)), reverse=True)
+        except ValueError:
+            # Round 값이 비정상인 행이 있으면 원래 순서를 유지한다.
+            pass
+
     if limit is not None:
-        rows = rows[:limit]
+        if latest:
+            rows = rows[:limit] if sort_desc else rows[-limit:]
+        else:
+            rows = rows[:limit]
+
+    if not rows:
+        print("No rows to display")
+        return
 
     headers = list(rows[0].keys())
     widths = {header: len(header) for header in headers}

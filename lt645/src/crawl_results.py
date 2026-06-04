@@ -55,6 +55,7 @@ def fetch_lotto_draw(round_no: int) -> dict[str, str] | None:
         "FirstWinners": str(item["rnk1WnNope"]),
         "SecondPrize": str(item["rnk2WnAmt"]),
         "SecondWinners": str(item["rnk2WnNope"]),
+        "ThirdPrize": str(item["rnk3WnAmt"]),
         "ThirdWinners": str(item["rnk3WnNope"]),
         "FourthWinners": str(item["rnk4WnNope"]),
         "FifthWinners": str(item["rnk5WnNope"]),
