@@ -74,3 +74,52 @@ If `requirements.txt` does not exist yet, create it after initial dependency ins
 ```powershell
 python -m pip freeze > requirements.txt
 ```
+
+## Backend (REST API for fsWeb)
+
+`lt645/src/backend.py` is a **FastAPI** server that exposes all CLI features as REST endpoints consumed by the `fsWeb` frontend.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/lt645/convert` | Convert `docs/result.md` → `db/result.csv` |
+| `POST` | `/api/lt645/crawl` | Fetch new draw results and append to CSV |
+| `POST` | `/api/lt645/crawl-range` | Fetch draws for a round range (`{ startRound, endRound }`) |
+| `GET`  | `/api/lt645/results` | Read CSV rows (`?startRound=&endRound=&limit=`) |
+| `GET`  | `/api/lt645/excluded` | List excluded number combinations |
+| `POST` | `/api/lt645/excluded` | Add an excluded combination (`{ numbers: number[] }`) |
+| `DELETE` | `/api/lt645/excluded/{id}` | Remove an excluded combination |
+| `POST` | `/api/lt645/generate` | Generate random combinations (`{ count: number }`) |
+
+### Prerequisites
+
+Install FastAPI and Uvicorn (already in `requirements.txt`):
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+### Start the backend
+
+**Using the batch script (recommended):**
+
+```cmd
+lt645\scripts\run_backend.bat
+```
+
+**Manually (from the project root with venv active):**
+
+```powershell
+python -m uvicorn backend:app --app-dir src --host 0.0.0.0 --port 8000 --reload
+```
+
+The API will be available at `http://localhost:8000`.  
+The fsWeb frontend reads the base URL from the `VITE_API_BASE_URL` environment variable (defaults to `http://localhost:8000`).
+
+### Interactive API docs
+
+While the server is running, open:
+
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
