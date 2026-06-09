@@ -16,11 +16,11 @@ if str(_SRC) not in sys.path:
 
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from common import DB_EXCLUDED_COMBINATIONS_PATH, read_csv_rows
+from common import DB_RESULT_PATH, DB_EXCLUDED_COMBINATIONS_PATH, read_csv_rows
 from convert_results import convert_result_md_to_csv
 from crawl_results import crawl_new_results, crawl_results_in_range
 from my_combinations import (
@@ -37,6 +37,26 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _combo_to_id(combo: tuple[int, ...]) -> str:
+    """Produce a stable string ID from a sorted 6-number tuple."""
+    return "-".join(str(n) for n in sorted(combo))
+
+
+def _id_to_combo(combo_id: str) -> tuple[int, ...] | None:
+    """Parse a combo ID back to a sorted tuple; return None if invalid."""
+    try:
+        parts = [int(x) for x in combo_id.split("-")]
+    except ValueError:
+        return None
+    if len(parts) != 6:
+        return None
+    return tuple(sorted(parts))
 
 
 # ---------------------------------------------------------------------------
@@ -72,11 +92,29 @@ def _csv_row_to_result(row: dict[str, str]) -> ResultRow | None:
 
 
 # ---------------------------------------------------------------------------
+# Request models
+# ---------------------------------------------------------------------------
+
+class CrawlRangeRequest(BaseModel):
+    startRound: int = Field(gt=0)
+    endRound: int = Field(gt=0)
+
+
+class AddExcludedRequest(BaseModel):
+    numbers: list[int]
+
+
+class GenerateRequest(BaseModel):
+    count: int = Field(default=5, gt=0)
+
+
+# ---------------------------------------------------------------------------
 # Menu 2 – Convert docs/result.md → db/result.csv
 # ---------------------------------------------------------------------------
 
 @app.post("/api/lt645/convert")
 def convert():
+    """Convert docs/result.md → db/result.csv (CLI menu 2)."""
     try:
         count = convert_result_md_to_csv()
     except FileNotFoundError as exc:
@@ -90,6 +128,7 @@ def convert():
 
 @app.post("/api/lt645/crawl")
 def crawl():
+    """Fetch new draw results and append to db/result.csv (CLI menu 3)."""
     count = crawl_new_results()
     return {"crawled": count}
 
@@ -98,19 +137,18 @@ def crawl():
 # Menu 4 – Crawl results by round range
 # ---------------------------------------------------------------------------
 
-class CrawlRangeRequest(BaseModel):
-    startRound: int = Field(gt=0)
-    endRound: int = Field(gt=0)
-
-
 @app.post("/api/lt645/crawl-range")
 def crawl_range(body: CrawlRangeRequest):
+    """Fetch draws for a specific round range (CLI menu 4)."""
     if body.startRound > body.endRound:
         raise HTTPException(
             status_code=422,
             detail="startRound must be less than or equal to endRound",
         )
-    count = crawl_results_in_range(body.startRound, body.endRound)
+    try:
+        count = crawl_results_in_range(body.startRound, body.endRound)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return {"crawled": count}
 
 
@@ -124,6 +162,7 @@ def get_results(
     endRound: Optional[int] = None,
     limit: Optional[int] = None,
 ):
+    """Return rows from db/result.csv (CLI menu 5)."""
     if startRound is not None and startRound <= 0:
         raise HTTPException(status_code=422, detail="startRound must be positive")
     if endRound is not None and endRound <= 0:
@@ -169,26 +208,20 @@ class ExcludedCombination(BaseModel):
     numbers: list[int]
 
 
-def _combos_to_response(combos: set[tuple[int, ...]]) -> list[ExcludedCombination]:
-    result: list[ExcludedCombination] = []
-    for combo in sorted(combos):
-        combo_id = "-".join(str(n) for n in combo)
-        result.append(ExcludedCombination(id=combo_id, numbers=list(combo)))
-    return result
-
-
 @app.get("/api/lt645/excluded")
 def list_excluded():
+    """Return all excluded number combinations (CLI menu 6 – show)."""
     combos = load_excluded_combinations()
-    return {"rows": _combos_to_response(combos)}
-
-
-class AddExcludedRequest(BaseModel):
-    numbers: list[int]
+    rows = [
+        ExcludedCombination(id=_combo_to_id(combo), numbers=list(combo))
+        for combo in sorted(combos)
+    ]
+    return {"rows": rows}
 
 
 @app.post("/api/lt645/excluded", status_code=201)
 def add_excluded(body: AddExcludedRequest):
+    """Add a new excluded combination (CLI menu 6 – add)."""
     nums = body.numbers
     if len(nums) != 6:
         raise HTTPException(status_code=422, detail="Exactly 6 numbers are required")
@@ -204,40 +237,32 @@ def add_excluded(body: AddExcludedRequest):
 
     combos.add(combo)
     save_excluded_combinations(combos)
-
-    combo_id = "-".join(str(n) for n in combo)
-    return ExcludedCombination(id=combo_id, numbers=list(combo))
+    return ExcludedCombination(id=_combo_to_id(combo), numbers=list(combo))
 
 
 @app.delete("/api/lt645/excluded/{combo_id}", status_code=204)
 def delete_excluded(combo_id: str):
-    try:
-        numbers = [int(p) for p in combo_id.split("-")]
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail="Invalid combination id") from exc
+    """Remove an excluded combination by its ID (CLI menu 6 – remove)."""
+    combo = _id_to_combo(combo_id)
+    if combo is None:
+        raise HTTPException(status_code=422, detail="Invalid combination id")
 
-    if len(numbers) != 6:
-        raise HTTPException(status_code=422, detail="Combination id must encode 6 numbers")
-
-    combo = tuple(sorted(numbers))
     combos = load_excluded_combinations()
     if combo not in combos:
         raise HTTPException(status_code=404, detail="Combination not found")
 
     combos.remove(combo)
     save_excluded_combinations(combos)
+    return Response(status_code=204)
 
 
 # ---------------------------------------------------------------------------
 # Menu 9 – Generate my number combinations
 # ---------------------------------------------------------------------------
 
-class GenerateRequest(BaseModel):
-    count: int = Field(default=5, gt=0)
-
-
 @app.post("/api/lt645/generate")
 def generate(body: GenerateRequest):
+    """Generate random number combinations excluding the excluded list (CLI menu 9)."""
     try:
         result = generate_my_number_combinations(body.count)
     except (ValueError, RuntimeError) as exc:
