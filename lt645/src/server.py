@@ -20,7 +20,7 @@ from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from common import DB_RESULT_PATH, DB_EXCLUDED_COMBINATIONS_PATH, read_csv_rows
+from common import DB_RESULT_PATH, DB_EXCLUDED_COMBINATIONS_PATH, DB_EXCLUDE_RULES_PATH, read_csv_rows
 from convert_results import convert_result_md_to_csv
 from crawl_results import crawl_new_results, crawl_results_in_range
 from my_combinations import (
@@ -106,6 +106,12 @@ class AddExcludedRequest(BaseModel):
 
 class GenerateRequest(BaseModel):
     count: int = Field(default=5, gt=0)
+
+
+class AddExcludeRuleRequest(BaseModel):
+    rule_name: str
+    function_name: str
+
 
 
 # ---------------------------------------------------------------------------
@@ -254,6 +260,82 @@ def delete_excluded(combo_id: str):
     combos.remove(combo)
     save_excluded_combinations(combos)
     return Response(status_code=204)
+
+
+@app.post("/api/lt645/exclude-rules", status_code=201)
+def add_exclude_rule(body: AddExcludeRuleRequest):
+    """Add a new exclude rule to exclude_rules.csv."""
+    import csv
+    from datetime import datetime
+
+    rule_name = body.rule_name.strip()
+    function_name = body.function_name.strip()
+
+    if not rule_name or not function_name:
+        raise HTTPException(status_code=422, detail="Both rule_name and function_name are required")
+
+    path = DB_EXCLUDE_RULES_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    file_exists = path.exists()
+
+    updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    fieldnames = ["rule_name", "function_name", "start_round", "end_round", "updated_at", "is_active"]
+
+    try:
+        with path.open("a", encoding="utf-8", newline="") as csv_file:
+            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow({
+                "rule_name": rule_name,
+                "function_name": function_name,
+                "start_round": "1",
+                "end_round": "",
+                "updated_at": updated_at,
+                "is_active": "Y",
+            })
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to write to file: {str(exc)}")
+
+    return {
+        "message": "Exclude rule saved successfully",
+        "rule_name": rule_name,
+        "function_name": function_name,
+        "start_round": "1",
+        "end_round": "",
+        "updated_at": updated_at,
+        "is_active": "Y",
+    }
+
+
+@app.get("/api/lt645/exclude-rules")
+def list_exclude_rules():
+    """Return all exclude rules from db/exclude_rules.csv."""
+    import csv
+
+    path = DB_EXCLUDE_RULES_PATH
+    if not path.exists():
+        return {"rows": []}
+
+    rows = []
+    try:
+        with path.open(encoding="utf-8", newline="") as csv_file:
+            reader = csv.DictReader(csv_file)
+            for row in reader:
+                rows.append({
+                    "rule_name": row.get("rule_name", ""),
+                    "function_name": row.get("function_name", ""),
+                    "start_round": row.get("start_round", "1"),
+                    "end_round": row.get("end_round", ""),
+                    "updated_at": row.get("updated_at", ""),
+                    "is_active": row.get("is_active", "Y"),
+                })
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to read file: {str(exc)}")
+
+    return {"rows": rows}
+
+
 
 
 # ---------------------------------------------------------------------------

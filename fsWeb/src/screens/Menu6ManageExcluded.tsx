@@ -1,30 +1,43 @@
 import { useEffect, useState } from "react";
-import { deleteExcludedCombination, getExcludedCombinations } from "../api/client";
-import { formatNumbers } from "../utils";
-import type { ExcludedCombination } from "../types";
+import { addExcludeRule, getExcludeRules } from "../api/client";
+import type { ExcludeRule } from "../types";
 import type { MenuProps } from "./types";
 
 export default function Menu6ManageExcluded({ runTask, setLastResponse, setMessage }: MenuProps) {
-  const [excludedRows, setExcludedRows] = useState<ExcludedCombination[]>([]);
-  const [visibleNumbers, setVisibleNumbers] = useState<Record<string, boolean>>({});
+  const [excludeRules, setExcludeRules] = useState<ExcludeRule[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [ruleName, setRuleName] = useState("");
+  const [functionName, setFunctionName] = useState("");
 
-  async function loadExcluded() {
-    const data = await getExcludedCombinations();
-    setExcludedRows(data.rows);
+  async function loadExcludeRules() {
+    const data = await getExcludeRules();
+    setExcludeRules(data.rows);
     setLastResponse(data);
   }
 
   useEffect(() => {
     runTask(async () => {
-      await loadExcluded();
-      setMessage("Loaded excluded combinations.");
+      await loadExcludeRules();
+      setMessage("Loaded exclude rules.");
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const toggleNumbers = (id: string) => {
-    setVisibleNumbers((prev) => ({ ...prev, [id]: !prev[id] }));
+  const handleSaveRule = () => {
+    if (!ruleName.trim() || !functionName.trim()) {
+      alert("규칙명과 호출 함수 명을 모두 입력해주세요.");
+      return;
+    }
+    runTask(async () => {
+      const result = await addExcludeRule(ruleName, functionName);
+      setMessage(`제외 규칙이 성공적으로 추가되었습니다: ${result.rule_name}`);
+      setIsModalOpen(false);
+      setRuleName("");
+      setFunctionName("");
+      await loadExcludeRules();
+    });
   };
+
 
   return (
     <section className="panel">
@@ -34,11 +47,22 @@ export default function Menu6ManageExcluded({ runTask, setLastResponse, setMessa
       <div className="row-actions">
         <button
           type="button"
+          onClick={() => setIsModalOpen(true)}
+          style={{
+            background: "var(--accent-emphasis)",
+            color: "#ffffff",
+            border: "1px solid rgba(0,0,0,0.1)"
+          }}
+        >
+          규칙 추가
+        </button>
+        <button
+          type="button"
           className="secondary"
           onClick={() =>
             runTask(async () => {
-              await loadExcluded();
-              setMessage("Excluded combinations refreshed.");
+              await loadExcludeRules();
+              setMessage("Exclude rules refreshed.");
             })
           }
         >
@@ -51,61 +75,28 @@ export default function Menu6ManageExcluded({ runTask, setLastResponse, setMessa
           <thead>
             <tr>
               <th>규칙명</th>
+              <th>호출 함수 명</th>
               <th>적용시작회차</th>
               <th>적용종료회차</th>
-              <th>적용숫자조회</th>
               <th>수정일자</th>
               <th>사용여부</th>
-              <th>작업</th>
             </tr>
           </thead>
           <tbody>
-            {excludedRows.length === 0 ? (
+            {excludeRules.length === 0 ? (
               <tr>
-                <td colSpan={7} style={{ textAlign: "center", color: "var(--fg-muted)", padding: "1.5rem" }}>
+                <td colSpan={6} style={{ textAlign: "center", color: "var(--fg-muted)", padding: "1.5rem" }}>
                   등록된 제외 규칙이 없습니다.
                 </td>
               </tr>
             ) : (
-              excludedRows.map((item, index) => (
-                <tr key={item.id}>
-                  <td>제외 규칙 #{index + 1}</td>
-                  <td>1회차</td>
-                  <td>무제한</td>
-                  <td>
-                    {visibleNumbers[item.id] ? (
-                      <span style={{ fontWeight: "600", color: "var(--accent-emphasis)" }}>
-                        {formatNumbers(item.numbers)}
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        style={{ padding: "0.2rem 0.5rem", fontSize: "0.75rem" }}
-                        onClick={() => toggleNumbers(item.id)}
-                      >
-                        조회
-                      </button>
-                    )}
-                    {visibleNumbers[item.id] && (
-                      <button
-                        type="button"
-                        style={{
-                          padding: "0.2rem 0.5rem",
-                          fontSize: "0.75rem",
-                          marginLeft: "0.5rem",
-                          background: "none",
-                          border: "none",
-                          color: "var(--fg-muted)",
-                          textDecoration: "underline",
-                          cursor: "pointer"
-                        }}
-                        onClick={() => toggleNumbers(item.id)}
-                      >
-                        숨기기
-                      </button>
-                    )}
-                  </td>
-                  <td>2026-06-10</td>
+              excludeRules.map((item, index) => (
+                <tr key={`${item.rule_name}-${index}`}>
+                  <td style={{ fontWeight: 500 }}>{item.rule_name}</td>
+                  <td><code>{item.function_name}</code></td>
+                  <td>{item.start_round ? `${item.start_round}회차` : "1회차"}</td>
+                  <td>{item.end_round ? `${item.end_round}회차` : "무제한"}</td>
+                  <td style={{ whiteSpace: "nowrap", fontSize: "0.82rem", color: "var(--fg-muted)" }}>{item.updated_at || "-"}</td>
                   <td>
                     <span
                       style={{
@@ -114,28 +105,12 @@ export default function Menu6ManageExcluded({ runTask, setLastResponse, setMessa
                         borderRadius: "4px",
                         fontSize: "0.75rem",
                         fontWeight: "600",
-                        background: "var(--accent-muted)",
-                        color: "var(--accent-emphasis)"
+                        background: item.is_active === "Y" ? "var(--accent-muted)" : "var(--bg-subtle)",
+                        color: item.is_active === "Y" ? "var(--accent-emphasis)" : "var(--fg-muted)"
                       }}
                     >
-                      사용중
+                      {item.is_active === "Y" ? "사용중" : "중지"}
                     </span>
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      className="danger"
-                      style={{ padding: "0.2rem 0.5rem", fontSize: "0.75rem" }}
-                      onClick={() =>
-                        runTask(async () => {
-                          await deleteExcludedCombination(item.id);
-                          await loadExcluded();
-                          setMessage("Excluded combination removed.");
-                        })
-                      }
-                    >
-                      Remove
-                    </button>
                   </td>
                 </tr>
               ))
@@ -143,6 +118,60 @@ export default function Menu6ManageExcluded({ runTask, setLastResponse, setMessa
           </tbody>
         </table>
       </div>
+
+      {isModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 600 }}>제외 규칙 추가</h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem" }}>
+              <label style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+                <span>규칙명</span>
+                <input
+                  type="text"
+                  placeholder="예: 홀수 6개 제외"
+                  value={ruleName}
+                  onChange={(e) => setRuleName(e.target.value)}
+                  style={{ width: "100%" }}
+                />
+              </label>
+              <label style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+                <span>호출 함수 명</span>
+                <input
+                  type="text"
+                  placeholder="예: exclude_all_odds"
+                  value={functionName}
+                  onChange={(e) => setFunctionName(e.target.value)}
+                  style={{ width: "100%" }}
+                />
+              </label>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.5rem" }}>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setRuleName("");
+                  setFunctionName("");
+                }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveRule}
+                style={{
+                  background: "var(--accent-emphasis)",
+                  color: "#ffffff",
+                  border: "1px solid rgba(0,0,0,0.1)"
+                }}
+              >
+                저장
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

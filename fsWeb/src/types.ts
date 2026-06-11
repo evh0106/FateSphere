@@ -25,6 +25,15 @@ export type ExcludedCombination = {
   numbers: number[];
 };
 
+export type ExcludeRule = {
+  rule_name: string;
+  function_name: string;
+  start_round: string;
+  end_round: string;
+  updated_at: string;
+  is_active: string;
+};
+
 export type ApiError = {
   message: string;
   details?: string;

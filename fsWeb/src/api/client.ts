@@ -1,4 +1,4 @@
-import type { ExcludedCombination, ResultRow } from "../types";
+import type { ExcludedCombination, ResultRow, ExcludeRule } from "../types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
@@ -78,6 +78,18 @@ export async function addExcludedCombination(numbers: number[]): Promise<Exclude
 export async function deleteExcludedCombination(id: string): Promise<void> {
   return request<void>(`/api/lt645/excluded/${id}`, { method: "DELETE" });
 }
+
+export async function addExcludeRule(ruleName: string, functionName: string): Promise<{ message: string; rule_name: string; function_name: string }> {
+  return request<{ message: string; rule_name: string; function_name: string }>("/api/lt645/exclude-rules", {
+    method: "POST",
+    body: JSON.stringify({ rule_name: ruleName, function_name: functionName })
+  });
+}
+
+export async function getExcludeRules(): Promise<{ rows: ExcludeRule[] }> {
+  return request<{ rows: ExcludeRule[] }>("/api/lt645/exclude-rules");
+}
+
 
 export async function generateMyCombinations(count: number): Promise<{ combinations: number[][] }> {
   return request<{ combinations: number[][] }>("/api/lt645/generate", {
