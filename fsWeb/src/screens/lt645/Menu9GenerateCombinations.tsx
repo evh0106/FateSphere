@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { generateMyCombinations } from "../api/client";
-import { formatNumbers } from "../utils";
+import { generateMyCombinations } from "../../api/client";
+import { formatNumbers } from "../../utils";
 import type { MenuProps } from "./types";
 
 export default function Menu9GenerateCombinations({ runTask, setLastResponse, setMessage }: MenuProps) {

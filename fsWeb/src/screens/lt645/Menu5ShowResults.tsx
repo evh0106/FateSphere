@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { getResults } from "../api/client";
-import { formatNumbers } from "../utils";
-import type { ResultRow } from "../types";
+import { getResults } from "../../api/client";
+import { formatNumbers } from "../../utils";
+import type { ResultRow } from "../../types";
 import type { MenuProps } from "./types";
 
 export default function Menu5ShowResults({ runTask, setLastResponse, setMessage }: MenuProps) {

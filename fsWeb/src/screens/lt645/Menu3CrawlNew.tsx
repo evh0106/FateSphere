@@ -1,4 +1,4 @@
-import { crawlNewResults } from "../api/client";
+import { crawlNewResults } from "../../api/client";
 import type { MenuProps } from "./types";
 
 export default function Menu3CrawlNew({ runTask, setLastResponse, setMessage }: MenuProps) {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { crawlRange } from "../api/client";
+import { crawlRange } from "../../api/client";
 import type { MenuProps } from "./types";
 
 export default function Menu4CrawlRange({ runTask, setLastResponse, setMessage }: MenuProps) {

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { ProbabilityRow } from "../types";
+import type { ProbabilityRow } from "../../types";
 
 function nCr(n: number, r: number): number {
   if (r < 0 || r > n) {

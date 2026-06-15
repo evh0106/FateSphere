@@ -1,4 +1,4 @@
-import { convertDocsResult } from "../api/client";
+import { convertDocsResult } from "../../api/client";
 import type { MenuProps } from "./types";
 
 export default function Menu2ConvertDocs({ runTask, setLastResponse, setMessage }: MenuProps) {

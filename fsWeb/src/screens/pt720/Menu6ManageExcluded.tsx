@@ -1,25 +1,53 @@
 import { useEffect, useState } from "react";
-import { addExcludeRule, getExcludeRules } from "../api/client";
-import type { ExcludeRule } from "../types";
+import type { ExcludeRule } from "../../types";
 import type { MenuProps } from "./types";
 
-export default function Menu6ManageExcluded({ runTask, setLastResponse, setMessage }: MenuProps) {
+// pt720 전용 스켈레톤 API 모방 클라이언트 로직
+const DUMMY_RULES: ExcludeRule[] = [
+  {
+    rule_name: "임시 제외 규칙 1",
+    function_name: "pt720_exclude_rule_1",
+    start_round: "1",
+    end_round: "",
+    updated_at: "2026-06-15 12:00:00",
+    is_active: "Y"
+  },
+  {
+    rule_name: "임시 제외 규칙 2",
+    function_name: "pt720_exclude_rule_2",
+    start_round: "5",
+    end_round: "10",
+    updated_at: "2026-06-15 12:05:00",
+    is_active: "N"
+  }
+];
+
+export default function Menu6ManageExcludedPt720({ runTask, setLastResponse, setMessage }: MenuProps) {
   const [excludeRules, setExcludeRules] = useState<ExcludeRule[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [ruleName, setRuleName] = useState("");
   const [functionName, setFunctionName] = useState("");
 
   async function loadExcludeRules() {
-    const data = await getExcludeRules();
-    setExcludeRules(data.rows);
-    setLastResponse(data);
+    // 스켈레톤이므로 더미 데이터 로딩 시뮬레이션
+    return new Promise<{ rows: ExcludeRule[] }>((resolve) => {
+      setTimeout(() => {
+        resolve({ rows: [...DUMMY_RULES] });
+      }, 300);
+    });
   }
 
-  useEffect(() => {
+  const reload = () => {
     runTask(async () => {
-      await loadExcludeRules();
-      setMessage("Loaded exclude rules.");
+      const data = await loadExcludeRules();
+      setExcludeRules(data.rows);
+      setLastResponse(data);
+      setMessage("Loaded pt720 exclude rules (Skeleton).");
     });
+  };
+
+  useEffect(() => {
+    reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -29,20 +57,30 @@ export default function Menu6ManageExcluded({ runTask, setLastResponse, setMessa
       return;
     }
     runTask(async () => {
-      const result = await addExcludeRule(ruleName, functionName);
-      setMessage(`제외 규칙이 성공적으로 추가되었습니다: ${result.rule_name}`);
+      // 로컬 상태 추가만 시뮬레이션
+      const newRule: ExcludeRule = {
+        rule_name: ruleName,
+        function_name: functionName,
+        start_round: "1",
+        end_round: "",
+        updated_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        is_active: "Y"
+      };
+      DUMMY_RULES.push(newRule);
+      setMessage(`[Skeleton] 제외 규칙이 추가되었습니다 (서버 저장되지 않음): ${ruleName}`);
       setIsModalOpen(false);
       setRuleName("");
       setFunctionName("");
-      await loadExcludeRules();
+      const data = await loadExcludeRules();
+      setExcludeRules(data.rows);
+      setLastResponse({ success: true, added: newRule });
     });
   };
 
-
   return (
     <section className="panel">
-      <h2>Manage Excluded Number Combinations</h2>
-      <p className="muted">Equivalent to CLI menu 6.</p>
+      <h2>Manage Excluded Number Combinations (pt720)</h2>
+      <p className="muted">Equivalent to CLI menu 6 (pt720 skeleton).</p>
       
       <div className="row-actions">
         <button
@@ -59,12 +97,7 @@ export default function Menu6ManageExcluded({ runTask, setLastResponse, setMessa
         <button
           type="button"
           className="secondary"
-          onClick={() =>
-            runTask(async () => {
-              await loadExcludeRules();
-              setMessage("Exclude rules refreshed.");
-            })
-          }
+          onClick={reload}
         >
           Refresh
         </button>
@@ -122,13 +155,13 @@ export default function Menu6ManageExcluded({ runTask, setLastResponse, setMessa
       {isModalOpen && (
         <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 600 }}>제외 규칙 추가</h3>
+            <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 600 }}>제외 규칙 추가 (pt720)</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem" }}>
               <label style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
                 <span>규칙명</span>
                 <input
                   type="text"
-                  placeholder="예: 홀수 6개 제외"
+                  placeholder="예: 조/일련번호 특정 규칙 제외"
                   value={ruleName}
                   onChange={(e) => setRuleName(e.target.value)}
                   style={{ width: "100%" }}
@@ -138,7 +171,7 @@ export default function Menu6ManageExcluded({ runTask, setLastResponse, setMessa
                 <span>호출 함수 명</span>
                 <input
                   type="text"
-                  placeholder="예: exclude_all_odds"
+                  placeholder="예: exclude_pt720_dummy"
                   value={functionName}
                   onChange={(e) => setFunctionName(e.target.value)}
                   style={{ width: "100%" }}
@@ -175,4 +208,3 @@ export default function Menu6ManageExcluded({ runTask, setLastResponse, setMessa
     </section>
   );
 }
-
