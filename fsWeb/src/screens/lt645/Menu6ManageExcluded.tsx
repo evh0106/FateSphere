@@ -22,10 +22,12 @@ export default function Menu6ManageExcluded({ runTask, setLastResponse, setMessa
   const [testExcludedCount, setTestExcludedCount] = useState<number | null>(null);
   const [testExcludedRows, setTestExcludedRows] = useState<ExcludedDrawRow[]>([]);
   const [testError, setTestError] = useState("");
+  const [checkedRows, setCheckedRows] = useState<Record<number, boolean>>({});
 
   async function loadExcludeRules() {
     const data = await getExcludeRules();
     setExcludeRules(data.rows);
+    setCheckedRows({});
     setLastResponse(data);
   }
 
@@ -44,7 +46,7 @@ export default function Menu6ManageExcluded({ runTask, setLastResponse, setMessa
     }
     runTask(async () => {
       const result = await addExcludeRule(ruleName, functionName);
-      setMessage(`제외 규칙이 성공적으로 추가되었습니다: ${result.rule_name}`);
+      setMessage(`Exclusion rule has been successfully added.: ${result.rule_name}`);
       setIsModalOpen(false);
       setRuleName("");
       setFunctionName("");
@@ -73,11 +75,18 @@ export default function Menu6ManageExcluded({ runTask, setLastResponse, setMessa
     });
   };
 
-  // const handleToggleActive = (index: number) => {
-  //   const updatedRules = [...excludeRules];
-  //   updatedRules[index].is_active = updatedRules[index].is_active === "Y" ? "N" : "Y";
-  //   setExcludeRules(updatedRules);
-  // };
+  const handleCheckRow = (index: number) => {
+    setCheckedRows(prev => ({
+      ...prev,
+      [index]: !prev[index]
+    }));
+  };
+
+  const handleStatusChange = (index: number, newStatus: string) => {
+    const updatedRules = [...excludeRules];
+    updatedRules[index].is_active = newStatus;
+    setExcludeRules(updatedRules);
+  };
 
   const handleSaveAllRules = () => {
     runTask(async () => {
@@ -156,7 +165,8 @@ export default function Menu6ManageExcluded({ runTask, setLastResponse, setMessa
                   <td style={{ textAlign: "center" }}>
                     <input
                       type="checkbox"
-                      //onChange={() => handleToggleActive(index)}
+                      checked={!!checkedRows[index]}
+                      onChange={() => handleCheckRow(index)}
                       style={{ cursor: "pointer", width: "16px", height: "16px" }}
                     />
                   </td>
@@ -166,19 +176,22 @@ export default function Menu6ManageExcluded({ runTask, setLastResponse, setMessa
                   <td>{item.end_round ? `${item.end_round}` : "All"}</td>
                   <td style={{ whiteSpace: "nowrap", fontSize: "0.82rem", color: "var(--fg-muted)" }}>{item.updated_at || "-"}</td>
                   <td>
-                    <span
+                    <select
+                      value={item.is_active}
+                      onChange={(e) => handleStatusChange(index, e.target.value)}
+                      disabled={!checkedRows[index]}
                       style={{
-                        display: "inline-block",
-                        padding: "0.1rem 0.4rem",
+                        padding: "0.2rem 0.4rem",
                         borderRadius: "4px",
-                        fontSize: "0.75rem",
-                        fontWeight: "600",
-                        background: item.is_active === "Y" ? "var(--accent-muted)" : "var(--bg-subtle)",
-                        color: item.is_active === "Y" ? "var(--accent-emphasis)" : "var(--fg-muted)"
+                        border: "1px solid var(--border-default)",
+                        background: checkedRows[index] ? "var(--bg-default)" : "var(--bg-subtle)",
+                        color: checkedRows[index] ? "var(--fg-default)" : "var(--fg-muted)",
+                        cursor: checkedRows[index] ? "pointer" : "not-allowed"
                       }}
                     >
-                      {item.is_active === "Y" ? "사용중" : "중지"}
-                    </span>
+                      <option value="Y">사용중</option>
+                      <option value="N">미사용</option>
+                    </select>
                   </td>
                   <td>
                     <button
