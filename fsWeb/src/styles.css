@@ -196,7 +196,6 @@ input {
   padding: 0.42rem 0.62rem;
   background: var(--bg-default);
   color: var(--fg-default);
-  min-width: 170px;
 }
 
 input:hover {
@@ -237,6 +236,7 @@ button.danger:hover {
   display: flex;
   gap: 0.55rem;
   margin-bottom: 0.8rem;
+  justify-content: flex-end;
 }
 
 .excluded-list {

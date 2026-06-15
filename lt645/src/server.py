@@ -113,6 +113,18 @@ class AddExcludeRuleRequest(BaseModel):
     function_name: str
 
 
+class ExcludeRuleModel(BaseModel):
+    rule_name: str
+    function_name: str
+    start_round: str
+    end_round: str
+    updated_at: str
+    is_active: str
+
+
+class SaveExcludeRulesRequest(BaseModel):
+    rules: list[ExcludeRuleModel]
+
 
 # ---------------------------------------------------------------------------
 # Menu 2 – Convert docs/result.md → db/result.csv
@@ -334,6 +346,45 @@ def list_exclude_rules():
         raise HTTPException(status_code=500, detail=f"Failed to read file: {str(exc)}")
 
     return {"rows": rows}
+
+
+@app.put("/api/lt645/exclude-rules")
+def save_exclude_rules(body: SaveExcludeRulesRequest):
+    """Save all exclude rules to db/exclude_rules.csv."""
+    import csv
+    
+    path = DB_EXCLUDE_RULES_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    
+    fieldnames = ["rule_name", "function_name", "start_round", "end_round", "updated_at", "is_active"]
+    
+    try:
+        with path.open("w", encoding="utf-8", newline="") as csv_file:
+            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+            writer.writeheader()
+            for rule in body.rules:
+                writer.writerow(rule.dict())
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to write to file: {str(exc)}")
+
+    return {"message": "Exclude rules saved successfully", "count": len(body.rules)}
+
+
+@app.post("/api/lt645/exclude-rules/run")
+def run_exclude_rule(body: dict):
+    """Run a specific exclusion rule function on draw history."""
+    function_name = body.get("function_name")
+    if not function_name:
+        raise HTTPException(status_code=422, detail="function_name is required")
+        
+    from my_combinations import run_exclude_rule_on_results
+    try:
+        excluded = run_exclude_rule_on_results(function_name)
+        return {"function_name": function_name, "excluded_count": len(excluded), "rows": excluded}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 

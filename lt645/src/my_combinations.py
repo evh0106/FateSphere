@@ -212,3 +212,73 @@ def run_generate_my_number_combinations() -> None:
     print("Generated my number combinations:")
     for index, combo in enumerate(generated, start=1):
         print(f"{index:>3}. {_format_combination(combo)}")
+
+
+# Sample exclusion functions
+def exclude_all_odds(combo: tuple[int, ...]) -> bool:
+    """Returns True if all numbers in the combination are odd."""
+    return all(n % 2 != 0 for n in combo)
+
+
+def exclude_all_evens(combo: tuple[int, ...]) -> bool:
+    """Returns True if all numbers in the combination are even."""
+    return all(n % 2 == 0 for n in combo)
+
+
+def exclude_sequential(combo: tuple[int, ...]) -> bool:
+    """Returns True if there are 3 or more consecutive numbers."""
+    s = sorted(combo)
+    for i in range(len(s) - 2):
+        if s[i+1] == s[i] + 1 and s[i+2] == s[i] + 2:
+            return True
+    return False
+
+
+def run_exclude_rule_on_results(function_name: str) -> list[dict]:
+    """
+    Runs the exclusion function specified by function_name against all results
+    in db/result.csv. Returns a list of excluded draw results.
+    """
+    # Map function name to actual python function
+    func_map = {
+        "exclude_all_odds": exclude_all_odds,
+        "exclude_all_evens": exclude_all_evens,
+        "exclude_sequential": exclude_sequential,
+    }
+    
+    func = func_map.get(function_name)
+    if not func:
+        # If dynamic lookup is preferred, try to find it in globals
+        func = globals().get(function_name)
+        
+    if not func:
+        raise ValueError(f"Function '{function_name}' is not defined in lt645 rules.")
+
+    from common import read_csv_rows
+    rows = read_csv_rows()
+    excluded_draws = []
+
+    for r in rows:
+        try:
+            combo = (
+                int(r["No1"]),
+                int(r["No2"]),
+                int(r["No3"]),
+                int(r["No4"]),
+                int(r["No5"]),
+                int(r["No6"]),
+            )
+            if func(combo):
+                excluded_draws.append({
+                    "round": int(r["Round"]),
+                    "numbers": list(combo),
+                    "bonus": int(r["Bonus"]),
+                    "draw_date": r.get("DrawDate") or r.get("draw_date") or ""
+                })
+        except (KeyError, ValueError):
+            continue
+
+    # Sort by round descending
+    excluded_draws.sort(key=lambda x: x["round"], reverse=True)
+    return excluded_draws
+

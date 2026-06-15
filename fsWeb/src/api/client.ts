@@ -90,6 +90,25 @@ export async function getExcludeRules(): Promise<{ rows: ExcludeRule[] }> {
   return request<{ rows: ExcludeRule[] }>("/api/lt645/exclude-rules");
 }
 
+export async function saveExcludeRules(rules: ExcludeRule[]): Promise<{ message: string; count: number }> {
+  return request<{ message: string; count: number }>("/api/lt645/exclude-rules", {
+    method: "PUT",
+    body: JSON.stringify({ rules })
+  });
+}
+
+export async function runExcludeRuleLt645(functionName: string): Promise<{
+  function_name: string;
+  excluded_count: number;
+  rows: Array<{ round: number; numbers: number[]; bonus: number; draw_date: string }>;
+}> {
+  return request("/api/lt645/exclude-rules/run", {
+    method: "POST",
+    body: JSON.stringify({ function_name: functionName })
+  });
+}
+
+
 
 export async function generateMyCombinations(count: number): Promise<{ combinations: number[][] }> {
   return request<{ combinations: number[][] }>("/api/lt645/generate", {
