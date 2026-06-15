@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import type { ProbabilityRow } from "../../types";
 
+const sourceFilePath = __SOURCE_FILE_PATH__;
+
 export default function Menu1PrizeProbabilities() {
   const probabilityRows: ProbabilityRow[] = useMemo(() => [
     { rank: "1st (All Correct)", favorable: 1, total: 5000000, probability: 1/5000000, odds: 5000000 },
@@ -9,6 +11,9 @@ export default function Menu1PrizeProbabilities() {
 
   return (
     <section className="panel">
+      <div style={{ fontSize: "0.8rem", color: "var(--fg-muted)", fontFamily: "monospace", marginBottom: "0.5rem" }}>
+        {sourceFilePath}
+      </div>
       <h2>Prize Probabilities (pt720)</h2>
       <p className="muted">Equivalent to CLI menu 1: Show prize probabilities (pt720 skeleton).</p>
       <table className="data-table">

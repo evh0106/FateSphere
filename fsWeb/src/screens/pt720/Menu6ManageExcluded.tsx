@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import type { ExcludeRule } from "../../types";
 import type { MenuProps } from "./types";
 
+const sourceFilePath = __SOURCE_FILE_PATH__;
+
 // pt720 전용 스켈레톤 API 모방 클라이언트 로직
 const DUMMY_RULES: ExcludeRule[] = [
   {
@@ -79,6 +81,9 @@ export default function Menu6ManageExcludedPt720({ runTask, setLastResponse, set
 
   return (
     <section className="panel">
+      <div style={{ fontSize: "0.8rem", color: "var(--fg-muted)", fontFamily: "monospace", marginBottom: "0.5rem" }}>
+        {sourceFilePath}
+      </div>
       <h2>Manage Excluded Number Combinations (pt720)</h2>
       <p className="muted">Equivalent to CLI menu 6 (pt720 skeleton).</p>
       

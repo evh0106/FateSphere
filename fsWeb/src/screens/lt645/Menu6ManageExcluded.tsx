@@ -10,6 +10,8 @@ interface ExcludedDrawRow {
   draw_date: string;
 }
 
+const sourceFilePath = __SOURCE_FILE_PATH__;
+
 export default function Menu6ManageExcluded({ runTask, setLastResponse, setMessage }: MenuProps) {
   const [excludeRules, setExcludeRules] = useState<ExcludeRule[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -98,6 +100,9 @@ export default function Menu6ManageExcluded({ runTask, setLastResponse, setMessa
 
   return (
     <section className="panel">
+      <div style={{ fontSize: "0.8rem", color: "var(--fg-muted)", fontFamily: "monospace", marginBottom: "0.5rem" }}>
+        {sourceFilePath}
+      </div>
       <h2>Manage Excluded Number Combinations</h2>
       <p className="muted">Equivalent to CLI menu 6.</p>
       

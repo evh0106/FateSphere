@@ -4,6 +4,8 @@ import { formatNumbers } from "../../utils";
 import type { ResultRow } from "../../types";
 import type { MenuProps } from "./types";
 
+const sourceFilePath = __SOURCE_FILE_PATH__;
+
 export default function Menu5ShowResults({ runTask, setLastResponse, setMessage }: MenuProps) {
   const [showStartRound, setShowStartRound] = useState("");
   const [showEndRound, setShowEndRound] = useState("");
@@ -40,6 +42,9 @@ export default function Menu5ShowResults({ runTask, setLastResponse, setMessage 
 
   return (
     <section className="panel">
+      <div style={{ fontSize: "0.8rem", color: "var(--fg-muted)", fontFamily: "monospace", marginBottom: "0.5rem" }}>
+        {sourceFilePath}
+      </div>
       <h2>Show db/result.csv</h2>
       <p className="muted">Equivalent to CLI menu 5 (latest 10 or round range).</p>
       <div className="form-row">

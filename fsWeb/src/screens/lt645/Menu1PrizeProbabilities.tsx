@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import type { ProbabilityRow } from "../../types";
 
+const sourceFilePath = __SOURCE_FILE_PATH__;
+
 function nCr(n: number, r: number): number {
   if (r < 0 || r > n) {
     return 0;
@@ -43,6 +45,9 @@ export default function Menu1PrizeProbabilities() {
 
   return (
     <section className="panel">
+      <div style={{ fontSize: "0.8rem", color: "var(--fg-muted)", fontFamily: "monospace", marginBottom: "0.5rem" }}>
+        {sourceFilePath}
+      </div>
       <h2>Prize Probabilities</h2>
       <p className="muted">Equivalent to CLI menu 1: Show prize probabilities.</p>
       <table className="data-table">

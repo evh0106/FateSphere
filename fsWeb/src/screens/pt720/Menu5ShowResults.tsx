@@ -1,12 +1,17 @@
 import { useState } from "react";
 import type { MenuProps } from "../lt645/types";
 
+const sourceFilePath = __SOURCE_FILE_PATH__;
+
 export default function Menu5ShowResults({ runTask, setLastResponse, setMessage }: MenuProps) {
   const [showStartRound, setShowStartRound] = useState("");
   const [showEndRound, setShowEndRound] = useState("");
 
   return (
     <section className="panel">
+      <div style={{ fontSize: "0.8rem", color: "var(--fg-muted)", fontFamily: "monospace", marginBottom: "0.5rem" }}>
+        {sourceFilePath}
+      </div>
       <h2>Show db/result.csv (pt720)</h2>
       <p className="muted">Equivalent to CLI menu 5 (pt720 skeleton).</p>
       <div className="form-row">
