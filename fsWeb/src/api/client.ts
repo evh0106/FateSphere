@@ -110,8 +110,8 @@ export async function runExcludeRuleLt645(functionName: string): Promise<{
 
 
 
-export async function generateMyCombinations(count: number): Promise<{ combinations: number[][] }> {
-  return request<{ combinations: number[][] }>("/api/lt645/generate", {
+export async function generateMyCombinations(count: number): Promise<{ combinations: number[][]; saved_file: string }> {
+  return request<{ combinations: number[][]; saved_file: string }>("/api/lt645/generate", {
     method: "POST",
     body: JSON.stringify({ count })
   });

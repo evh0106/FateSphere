@@ -8,6 +8,7 @@ const sourceFilePath = __SOURCE_FILE_PATH__;
 export default function Menu9GenerateCombinations({ runTask, setLastResponse, setMessage }: MenuProps) {
   const [generateCount, setGenerateCount] = useState("5");
   const [generatedRows, setGeneratedRows] = useState<number[][]>([]);
+  const [savedFile, setSavedFile] = useState<string>("");
 
   function renderGeneratedList() {
     if (generatedRows.length === 0) {
@@ -46,14 +47,20 @@ export default function Menu9GenerateCombinations({ runTask, setLastResponse, se
             }
             const data = await generateMyCombinations(count);
             setGeneratedRows(data.combinations);
+            setSavedFile(data.saved_file);
             setLastResponse(data);
-            setMessage(`Generated ${data.combinations.length} combinations.`);
+            setMessage(`Generated ${data.combinations.length} combinations. Saved to ${data.saved_file}`);
           })
         }
       >
         Generate
       </button>
       {renderGeneratedList()}
+      {savedFile && (
+        <p style={{ fontSize: "0.85rem", color: "var(--fg-muted)", marginTop: "0.5rem" }}>
+          💾 Saved to: <code style={{ color: "var(--fg-default)" }}>lt645/db/{savedFile}</code>
+        </p>
+      )}
     </section>
   );
 }

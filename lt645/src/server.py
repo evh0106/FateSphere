@@ -396,11 +396,40 @@ def run_exclude_rule(body: dict):
 @app.post("/api/lt645/generate")
 def generate(body: GenerateRequest):
     """Generate random number combinations excluding the excluded list (CLI menu 9)."""
+    import csv
+    from datetime import datetime
+
     try:
         result = generate_my_number_combinations(body.count)
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return {"combinations": [list(combo) for combo in result]}
+
+    # 생성된 번호를 CSV 파일로 저장
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"generate_number_{timestamp}.csv"
+    db_dir = Path(__file__).resolve().parent.parent / "db"
+    db_dir.mkdir(parents=True, exist_ok=True)
+    filepath = db_dir / filename
+
+    fieldnames = ["No", "No1", "No2", "No3", "No4", "No5", "No6"]
+    with filepath.open("w", encoding="utf-8", newline="") as csv_file:
+        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+        writer.writeheader()
+        for idx, combo in enumerate(result, start=1):
+            writer.writerow({
+                "No": idx,
+                "No1": combo[0],
+                "No2": combo[1],
+                "No3": combo[2],
+                "No4": combo[3],
+                "No5": combo[4],
+                "No6": combo[5],
+            })
+
+    return {
+        "combinations": [list(combo) for combo in result],
+        "saved_file": filename,
+    }
 
 
 # ---------------------------------------------------------------------------

@@ -162,12 +162,57 @@ def manage_excluded_number_combinations() -> None:
         print("Invalid choice")
 
 
+def _load_active_exclude_rule_functions() -> list[callable]:
+    """
+    exclude_rules.csv에서 is_active == 'Y'(사용중)인 규칙의 함수들을 로드하여 반환한다.
+    """
+    import csv as _csv
+    from common import DB_EXCLUDE_RULES_PATH
+
+    path = DB_EXCLUDE_RULES_PATH
+    if not path.exists():
+        return []
+
+    # Map function name to actual python function
+    func_map = {
+        "exclude_all_odds": exclude_all_odds,
+        "exclude_all_evens": exclude_all_evens,
+        "exclude_sequential": exclude_sequential,
+    }
+
+    active_funcs: list[callable] = []
+
+    try:
+        with path.open(encoding="utf-8", newline="") as csv_file:
+            reader = _csv.DictReader(csv_file)
+            for row in reader:
+                is_active = row.get("is_active", "N").strip()
+                if is_active != "Y":
+                    continue
+
+                function_name = row.get("function_name", "").strip()
+                if not function_name:
+                    continue
+
+                func = func_map.get(function_name)
+                if not func:
+                    # Dynamic lookup in globals
+                    func = globals().get(function_name)
+                if func and callable(func):
+                    active_funcs.append(func)
+    except Exception:
+        pass
+
+    return active_funcs
+
+
 def generate_my_number_combinations(count: int) -> list[tuple[int, ...]]:
-    # 제외 목록을 반영해 중복 없는 번호 조합을 원하는 개수만큼 생성한다.
+    # 제외 목록과 활성화된 제외 규칙을 반영해 중복 없는 번호 조합을 원하는 개수만큼 생성한다.
     if count <= 0:
         raise ValueError("count must be a positive integer")
 
     excluded = load_excluded_combinations()
+    active_rule_funcs = _load_active_exclude_rule_functions()
     generated: set[tuple[int, ...]] = set()
 
     # 45C6 = 8,145,060
@@ -184,6 +229,11 @@ def generate_my_number_combinations(count: int) -> list[tuple[int, ...]]:
 
         if combo in excluded:
             continue
+
+        # 활성화된 제외 규칙(is_active == 'Y')에 해당하면 제외
+        if any(rule_func(combo) for rule_func in active_rule_funcs):
+            continue
+
         generated.add(combo)
 
     if len(generated) < count:
