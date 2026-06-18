@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { addExcludeRule, getExcludeRules, runExcludeRuleLt645, saveExcludeRules } from "../../api/client";
 import type { ExcludeRule } from "../../types";
 import type { MenuProps } from "./types";
@@ -84,11 +84,27 @@ export default function Menu6ManageExcluded({ runTask, setLastResponse, setMessa
     }));
   };
 
-  const handleStatusChange = (index: number, newStatus: string) => {
+  const handleFieldChange = (index: number, field: keyof ExcludeRule, value: string) => {
     const updatedRules = [...excludeRules];
-    updatedRules[index].is_active = newStatus;
+    updatedRules[index] = { ...updatedRules[index], [field]: value };
     setExcludeRules(updatedRules);
   };
+
+  const handleStatusChange = (index: number, newStatus: string) => {
+    handleFieldChange(index, "is_active", newStatus);
+  };
+
+  const editableInputStyle = (isChecked: boolean): CSSProperties => ({
+    width: "100%",
+    padding: "0.2rem 0.4rem",
+    borderRadius: "4px",
+    border: "1px solid var(--border-default)",
+    background: isChecked ? "var(--bg-default)" : "var(--bg-subtle)",
+    color: isChecked ? "var(--fg-default)" : "var(--fg-muted)",
+    cursor: isChecked ? "text" : "not-allowed",
+    fontFamily: "inherit",
+    fontSize: "inherit"
+  });
 
   const handleSaveAllRules = () => {
     runTask(async () => {
@@ -175,10 +191,43 @@ export default function Menu6ManageExcluded({ runTask, setLastResponse, setMessa
                       style={{ cursor: "pointer", width: "16px", height: "16px" }}
                     />
                   </td>
-                  <td style={{ fontWeight: 500 }}>{item.rule_name}</td>
-                  <td><code>{item.function_name}</code></td>
-                  <td>{item.start_round ? `${item.start_round}` : "1"}</td>
-                  <td>{item.end_round ? `${item.end_round}` : "All"}</td>
+                  <td>
+                    <input
+                      type="text"
+                      value={item.rule_name}
+                      onChange={(e) => handleFieldChange(index, "rule_name", e.target.value)}
+                      disabled={!checkedRows[index]}
+                      style={{ ...editableInputStyle(!!checkedRows[index]), fontWeight: 500 }}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="text"
+                      value={item.function_name}
+                      onChange={(e) => handleFieldChange(index, "function_name", e.target.value)}
+                      disabled={!checkedRows[index]}
+                      style={{ ...editableInputStyle(!!checkedRows[index]), fontFamily: "monospace" }}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="text"
+                      value={item.start_round || "1"}
+                      onChange={(e) => handleFieldChange(index, "start_round", e.target.value)}
+                      disabled={!checkedRows[index]}
+                      style={editableInputStyle(!!checkedRows[index])}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="text"
+                      value={item.end_round}
+                      placeholder="All"
+                      onChange={(e) => handleFieldChange(index, "end_round", e.target.value)}
+                      disabled={!checkedRows[index]}
+                      style={editableInputStyle(!!checkedRows[index])}
+                    />
+                  </td>
                   <td style={{ whiteSpace: "nowrap", fontSize: "0.82rem", color: "var(--fg-muted)" }}>{item.updated_at || "-"}</td>
                   <td>
                     <select

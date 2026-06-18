@@ -1,3 +1,4 @@
 rule_name,function_name,start_round,end_round,updated_at,is_active
-규칙1,exclude_sequential,1,,2026-06-11 23:43:00,Y
-규칙2,exclude_all_odds,1,,2026-06-11 23:43:53,Y
+exclude_sequential,exclude_sequential,1,,2026-06-11 23:43:00,Y
+exclude_all_odds,exclude_all_odds,1,,2026-06-11 23:43:53,Y
+exclude_all_evens,exclude_all_evens,1,,2026-06-18 23:10:07,Y

@@ -215,16 +215,28 @@ def run_generate_my_number_combinations() -> None:
 
 
 # Sample exclusion functions
+"""
+Exclude all odd numbers
+Odd numbers are not allowed in the lottery.
+"""
 def exclude_all_odds(combo: tuple[int, ...]) -> bool:
     """Returns True if all numbers in the combination are odd."""
     return all(n % 2 != 0 for n in combo)
 
 
+"""
+Exclude all even numbers
+Even numbers are not allowed in the lottery.
+"""
 def exclude_all_evens(combo: tuple[int, ...]) -> bool:
     """Returns True if all numbers in the combination are even."""
     return all(n % 2 == 0 for n in combo)
 
 
+"""
+Exclude sequential numbers (e.g. 1,2,3,4,5,6)
+Sequential numbers are not allowed in the lottery.
+"""
 def exclude_sequential(combo: tuple[int, ...]) -> bool:
     """Returns True if there are 3 or more consecutive numbers."""
     s = sorted(combo)
