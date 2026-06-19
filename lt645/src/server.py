@@ -20,7 +20,7 @@ from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from common import DB_RESULT_PATH, DB_EXCLUDED_COMBINATIONS_PATH, DB_EXCLUDE_RULES_PATH, read_csv_rows
+from common import DB_GN_PATH, DB_RESULT_PATH, DB_EXCLUDED_COMBINATIONS_PATH, DB_EXCLUDE_RULES_PATH, read_csv_rows
 from convert_results import convert_result_md_to_csv
 from crawl_results import crawl_new_results, crawl_results_in_range
 from my_combinations import (
@@ -106,6 +106,10 @@ class AddExcludedRequest(BaseModel):
 
 class GenerateRequest(BaseModel):
     count: int = Field(default=5, gt=0)
+
+
+class DeleteGeneratedFilesRequest(BaseModel):
+    file_names: list[str] = Field(min_length=1)
 
 
 class AddExcludeRuleRequest(BaseModel):
@@ -492,6 +496,51 @@ def run_exclude_rule(body: dict):
 # Menu 9 – Generate my number combinations
 # ---------------------------------------------------------------------------
 
+def _validate_gn_filename(file_name: str) -> str:
+    """Return a safe basename for a file under db/gn; raise HTTPException if invalid."""
+    name = Path(file_name).name
+    if not name or name != file_name or ".." in file_name:
+        raise HTTPException(status_code=422, detail=f"Invalid file name: {file_name}")
+    if not name.endswith(".csv"):
+        raise HTTPException(status_code=422, detail=f"Only CSV files can be deleted: {file_name}")
+    return name
+
+
+@app.get("/api/lt645/generated-files")
+def list_generated_files():
+    """Return CSV file names from db/gn, newest first."""
+    DB_GN_PATH.mkdir(parents=True, exist_ok=True)
+    files = sorted(
+        (path.name for path in DB_GN_PATH.glob("*.csv") if path.is_file()),
+        reverse=True,
+    )
+    return {"rows": [{"file_name": name} for name in files]}
+
+
+@app.delete("/api/lt645/generated-files")
+def delete_generated_files(body: DeleteGeneratedFilesRequest):
+    """Delete selected CSV files from db/gn."""
+    deleted: list[str] = []
+    errors: list[str] = []
+
+    for raw_name in body.file_names:
+        file_name = _validate_gn_filename(raw_name)
+        filepath = DB_GN_PATH / file_name
+        if not filepath.is_file():
+            errors.append(f"File not found: {file_name}")
+            continue
+        try:
+            filepath.unlink()
+            deleted.append(file_name)
+        except OSError as exc:
+            errors.append(f"Failed to delete {file_name}: {exc}")
+
+    if not deleted and errors:
+        raise HTTPException(status_code=404, detail="; ".join(errors))
+
+    return {"deleted": deleted, "errors": errors}
+
+
 @app.post("/api/lt645/generate")
 def generate(body: GenerateRequest):
     """Generate random number combinations excluding the excluded list (CLI menu 9)."""
@@ -507,10 +556,8 @@ def generate(body: GenerateRequest):
     # 파일명에 현재 날짜와 시간을 포함하여 고유하게 생성
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"generate_number_{timestamp}.csv"
-    # Create the db directory if it doesn't exist
-    db_dir = Path(__file__).resolve().parent.parent / "db"
-    db_dir.mkdir(parents=True, exist_ok=True)
-    filepath = db_dir / filename
+    DB_GN_PATH.mkdir(parents=True, exist_ok=True)
+    filepath = DB_GN_PATH / filename
 
     # Write the generated combinations to the CSV file
     fieldnames = ["No", "No1", "No2", "No3", "No4", "No5", "No6"]
@@ -527,6 +574,8 @@ def generate(body: GenerateRequest):
                 "No5": combo[4],
                 "No6": combo[5],
             })
+
+    print(f"Generated {len(result)} combinations and saved to {filename}")
 
     return {
         "combinations": [list(combo) for combo in result],

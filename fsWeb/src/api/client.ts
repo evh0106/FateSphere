@@ -121,3 +121,14 @@ export async function generateMyCombinations(count: number): Promise<{ combinati
     body: JSON.stringify({ count })
   });
 }
+
+export async function getGeneratedFiles(): Promise<{ rows: Array<{ file_name: string }> }> {
+  return request<{ rows: Array<{ file_name: string }> }>("/api/lt645/generated-files");
+}
+
+export async function deleteGeneratedFiles(fileNames: string[]): Promise<{ deleted: string[]; errors: string[] }> {
+  return request<{ deleted: string[]; errors: string[] }>("/api/lt645/generated-files", {
+    method: "DELETE",
+    body: JSON.stringify({ file_names: fileNames })
+  });
+}
