@@ -2,3 +2,4 @@ rule_name,function_name,start_round,end_round,updated_at,is_active
 exclude_sequential,exclude_sequential,1,,2026-06-11 23:43:00,Y
 exclude_all_odds,exclude_all_odds,1,,2026-06-11 23:43:53,Y
 exclude_all_evens,exclude_all_evens,1,,2026-06-18 23:10:07,Y
+exclude_matching_numbers,exclude_matching_numbers,1,,2026-06-19 09:47:14,Y

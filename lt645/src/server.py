@@ -405,12 +405,15 @@ def generate(body: GenerateRequest):
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     # 생성된 번호를 CSV 파일로 저장
+    # 파일명에 현재 날짜와 시간을 포함하여 고유하게 생성
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"generate_number_{timestamp}.csv"
+    # Create the db directory if it doesn't exist
     db_dir = Path(__file__).resolve().parent.parent / "db"
     db_dir.mkdir(parents=True, exist_ok=True)
     filepath = db_dir / filename
 
+    # Write the generated combinations to the CSV file
     fieldnames = ["No", "No1", "No2", "No3", "No4", "No5", "No6"]
     with filepath.open("w", encoding="utf-8", newline="") as csv_file:
         writer = csv.DictWriter(csv_file, fieldnames=fieldnames)

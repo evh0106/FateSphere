@@ -33,6 +33,9 @@ def _format_combination(combo: tuple[int, ...]) -> str:
     return " ".join(f"{number:02d}" for number in combo)
 
 
+"""
+Load and save excluded combinations from/to CSV file.
+"""
 def load_excluded_combinations(
     path: Path = DB_EXCLUDED_COMBINATIONS_PATH,
 ) -> set[tuple[int, ...]]:
@@ -46,11 +49,13 @@ def load_excluded_combinations(
         for row in reader:
             values: list[int] = []
             try:
+                # Read 6 numbers from the row
                 for index in range(1, 7):
                     values.append(int(row.get(f"No{index}", "0")))
             except ValueError:
                 continue
-
+            
+            # Validate the values
             if any(value < 1 or value > 45 for value in values):
                 continue
             if len(set(values)) != 6:
@@ -178,6 +183,7 @@ def _load_active_exclude_rule_functions() -> list[callable]:
         "exclude_all_odds": exclude_all_odds,
         "exclude_all_evens": exclude_all_evens,
         "exclude_sequential": exclude_sequential,
+        "exclude_matching_numbers": exclude_matching_numbers,
     }
 
     active_funcs: list[callable] = []
@@ -211,7 +217,12 @@ def generate_my_number_combinations(count: int) -> list[tuple[int, ...]]:
     if count <= 0:
         raise ValueError("count must be a positive integer")
 
+    # 제외 조합을 로드한다.
+    # load_excluded_combinations()는 lt645/db/excluded_combinations.csv 파일을 읽어 정렬된 6개 번호 튜플 집합으로 반환한다.
     excluded = load_excluded_combinations()
+
+    # 활성화된 제외 규칙(is_active == 'Y')에 해당하는 함수들을 로드한다.
+    # _load_active_exclude_rule_functions()는 lt645/db/exclude_rules.csv 파일을 읽어 is_active == 'Y'인 규칙의 함수들을 반환한다.
     active_rule_funcs = _load_active_exclude_rule_functions()
     generated: set[tuple[int, ...]] = set()
 
@@ -221,9 +232,12 @@ def generate_my_number_combinations(count: int) -> list[tuple[int, ...]]:
         raise ValueError("Requested count exceeds available combinations")
 
     attempts = 0
+    # 무한 루프 방지 위해 최대 시도 횟수 설정 (생성 개수의 50배 또는 1000 중 큰 값)
     max_attempts = max(1000, count * 50)
 
+    # 랜덤으로 조합을 생성하되, 제외 목록과 활성화된 규칙에 해당하는 조합은 건너뛴다.
     while len(generated) < count and attempts < max_attempts:
+        # 1~45 사이의 숫자 6개를 랜덤하게 뽑아 정렬된 튜플로 만든다.
         combo = tuple(sorted(random.sample(range(1, 46), 6)))
         attempts += 1
 
@@ -263,14 +277,16 @@ def run_generate_my_number_combinations() -> None:
     for index, combo in enumerate(generated, start=1):
         print(f"{index:>3}. {_format_combination(combo)}")
 
-
-# Sample exclusion functions
+# Exclusion rules for lottery combinations
 """
 Exclude all odd numbers
 Odd numbers are not allowed in the lottery.
 """
 def exclude_all_odds(combo: tuple[int, ...]) -> bool:
     """Returns True if all numbers in the combination are odd."""
+
+    print("Apply exclude_all_odds")
+
     return all(n % 2 != 0 for n in combo)
 
 
@@ -280,6 +296,9 @@ Even numbers are not allowed in the lottery.
 """
 def exclude_all_evens(combo: tuple[int, ...]) -> bool:
     """Returns True if all numbers in the combination are even."""
+
+    print("Apply exclude_all_evens")
+
     return all(n % 2 == 0 for n in combo)
 
 
@@ -289,10 +308,42 @@ Sequential numbers are not allowed in the lottery.
 """
 def exclude_sequential(combo: tuple[int, ...]) -> bool:
     """Returns True if there are 3 or more consecutive numbers."""
+
+    print("Apply exclude_sequential")
+
     s = sorted(combo)
     for i in range(len(s) - 2):
         if s[i+1] == s[i] + 1 and s[i+2] == s[i] + 2:
             return True
+    return False
+
+
+"""
+Exclude matching numbers from the lt645\db\result.csv data.
+"""
+def exclude_matching_numbers(combo: tuple[int, ...]) -> bool:
+    """
+    Returns True if the combination matches any draw result in db/result.csv.
+    """
+
+    print("Apply exclude_matching_numbers")
+
+    from common import read_csv_rows
+    rows = read_csv_rows()
+    for r in rows:
+        try:
+            draw_combo = (
+                int(r["No1"]),
+                int(r["No2"]),
+                int(r["No3"]),
+                int(r["No4"]),
+                int(r["No5"]),
+                int(r["No6"]),
+            )
+            if set(combo) == set(draw_combo):
+                return True
+        except (KeyError, ValueError):
+            continue
     return False
 
 

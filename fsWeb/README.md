@@ -12,6 +12,8 @@ Web frontend program for the `lt645` backend and future services.
 
 ## Quick Start
 
+0. Install node js
+
 1. Install dependencies
 
 ```powershell
