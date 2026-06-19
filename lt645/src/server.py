@@ -432,14 +432,23 @@ def generate_exclude_rules(body: SaveExcludeRulesRequest):
                 "No6": combo[5],
             })
     
-    # generated_combos 내 숫자를 정렬하고 중복 제거
-    unique_combos = {}
-    for combo in generated_combos:
-        combo_key = tuple(sorted([combo["No1"], combo["No2"], combo["No3"], combo["No4"], combo["No5"], combo["No6"]]))
-        if combo_key not in unique_combos:
-            unique_combos[combo_key] = combo
+    # # generated_combos 내 숫자를 정렬하고 중복 제거
+    # unique_combos = {}
+    # for combo in generated_combos:
+    #     combo_key = tuple(sorted([combo["function_name"], combo["No1"], combo["No2"], combo["No3"], combo["No4"], combo["No5"], combo["No6"]]))
+    #     if combo_key not in unique_combos:
+    #         unique_combos[combo_key] = combo
 
-    generated_count = len(unique_combos)
+    generated_count = len(generated_combos)
+
+    print(f"Total generated exclude combinations: {generated_count}")
+    # 데이터 확인용으로 맨 위 5개와 맨 아래 5개 출력
+    for index, combo in enumerate(generated_combos[:5], start=1):
+        print(f"{index:>3}. {combo}")
+    if generated_count > 5:
+        print("...")
+        for index, combo in enumerate(generated_combos[-5:], start=generated_count-4):
+            print(f"{index:>3}. {combo}")
 
     # Save the provided rules to the CSV file
     path = DB_EXCLUDED_COMBINATIONS_PATH
@@ -451,8 +460,10 @@ def generate_exclude_rules(body: SaveExcludeRulesRequest):
         with path.open("w", encoding="utf-8", newline="") as csv_file:
             writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
             writer.writeheader()
-            for combo in unique_combos.values():
+            # for combo in generated_combos.values():
+            for combo in generated_combos:
                 writer.writerow(combo)
+
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to write to file: {str(exc)}")
 

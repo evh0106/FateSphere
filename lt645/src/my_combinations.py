@@ -423,7 +423,7 @@ def generate_excluded_rules(function_name: list[dict]) -> dict:
     if not func:
         raise ValueError(f"Function '{function_name}' is not defined in lt645 rules.")
     
-    # 모든 6개 번호 조합을 생성하고, 제외 규칙에 해당하는 조합을 제외한 후, 제외 목록을 CSV로 저장한다.
+    # 모든 6개 번호 조합을 생성하고 func 함수에 해당 조합을 전달하여 True를 반환하는 조합을 excluded_combos 집합에 추가한다.
     excluded_combos: set[tuple[int, ...]] = set()
     for c in combinations(range(1, 46), 6):
     # for combo in combinations(range(1, 46), 6):
@@ -434,6 +434,9 @@ def generate_excluded_rules(function_name: list[dict]) -> dict:
 
         if func(combo):
             excluded_combos.add(combo)
+
+    # excluded_combos 집합을 정렬하여 리스트로 변환한다.
+    excluded_combos = sorted(excluded_combos)
 
     # excluded_combos 에서 상위 5개만 출력 (디버그용)
     if excluded_combos:
