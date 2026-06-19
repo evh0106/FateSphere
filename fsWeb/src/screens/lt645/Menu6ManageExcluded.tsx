@@ -232,7 +232,8 @@ export default function Menu6ManageExcluded({ runTask, setLastResponse, setMessa
                   <td>
                     <input
                       type="text"
-                      value={item.start_round || "1"}
+                      value={item.start_round}
+                      placeholder="All"
                       onChange={(e) => handleFieldChange(index, "start_round", e.target.value)}
                       disabled={!checkedRows[index]}
                       style={editableInputStyle(!!checkedRows[index])}

@@ -382,14 +382,21 @@ def generate_exclude_rules(body: SaveExcludeRulesRequest):
     else:
         print(f"Generating exclude combinations based on {len(active_rules)} active rules.")
 
-    # active_rules에서 function_name을 추출하여 my_combinations 모듈의 run_exclude_rule_on_results 함수를 호출하여 제외 조합을 생성
-    
+    # active_rules에서 start_round 가 1 이상인 규칙들의 function_name을 추출하여 my_combinations 모듈의 run_exclude_rule_on_results 함수를 호출하여 제외 조합을 생성
     from my_combinations import run_exclude_rule_on_results
 
+    # Filter rules with start_round >= 1
+    filtered_rules = [rule for rule in active_rules if int(rule.start_round if rule.start_round else 0) >= 1]
+    if not filtered_rules:
+        raise HTTPException(status_code=422, detail="No active rules with start_round >= 1 provided for generation")
+
     generated_combos = []
-    for rule in active_rules:
+    for rule in filtered_rules:
         function_name = rule.function_name
         excluded = run_exclude_rule_on_results(function_name)
+
+        print (f"run_exclude_rule_on_results '{rule.rule_name}' (function: {function_name}) generated {len(excluded)} excluded combinations.")
+
         for combo in excluded:
             generated_combos.append({
                 "function_name": function_name,
@@ -400,7 +407,39 @@ def generate_exclude_rules(body: SaveExcludeRulesRequest):
                 "No5": combo["numbers"][4],
                 "No6": combo["numbers"][5],
             })
-    generated_count = len(generated_combos)
+
+    # active_rules에서 start_round와 end_round 값이 모두 없는 규칙들의 function_name을 추출하여 my_combinations 모듈의 generate_excluded_rules 함수를 호출하여 제외 조합을 생성
+    from my_combinations import generate_excluded_rules
+
+    no_round_rules = [rule for rule in active_rules if int(rule.start_round if rule.start_round else 0) <= 0 and int(rule.end_round if rule.end_round else 0) <= 0]
+
+    print(f"Generating exclude combinations based on {len(no_round_rules)} rules without start_round and end_round.")
+
+    for rule in no_round_rules:
+        function_name = rule.function_name
+        excluded = generate_excluded_rules(function_name)
+
+        print (f"generate_excluded_rules '{rule.rule_name}' (function: {function_name}) generated {len(excluded)} excluded combinations.")
+
+        for combo in excluded:
+            generated_combos.append({
+                "function_name": function_name,
+                "No1": combo[0],
+                "No2": combo[1],
+                "No3": combo[2],
+                "No4": combo[3],
+                "No5": combo[4],
+                "No6": combo[5],
+            })
+    
+    # generated_combos 내 숫자를 정렬하고 중복 제거
+    unique_combos = {}
+    for combo in generated_combos:
+        combo_key = tuple(sorted([combo["No1"], combo["No2"], combo["No3"], combo["No4"], combo["No5"], combo["No6"]]))
+        if combo_key not in unique_combos:
+            unique_combos[combo_key] = combo
+
+    generated_count = len(unique_combos)
 
     # Save the provided rules to the CSV file
     path = DB_EXCLUDED_COMBINATIONS_PATH
@@ -412,7 +451,7 @@ def generate_exclude_rules(body: SaveExcludeRulesRequest):
         with path.open("w", encoding="utf-8", newline="") as csv_file:
             writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
             writer.writeheader()
-            for combo in generated_combos:
+            for combo in unique_combos.values():
                 writer.writerow(combo)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to write to file: {str(exc)}")

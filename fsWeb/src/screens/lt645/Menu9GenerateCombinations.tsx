@@ -6,7 +6,7 @@ import type { MenuProps } from "./types";
 const sourceFilePath = __SOURCE_FILE_PATH__;
 
 export default function Menu9GenerateCombinations({ runTask, setLastResponse, setMessage }: MenuProps) {
-  const [generateCount, setGenerateCount] = useState("5");
+  const [generateCount, setGenerateCount] = useState("2000");
   const [generatedRows, setGeneratedRows] = useState<number[][]>([]);
   const [savedFile, setSavedFile] = useState<string>("");
 
