@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import { addExcludeRule, getExcludeRules, runExcludeRuleLt645, saveExcludeRules } from "../../api/client";
+import { addExcludeRule, getExcludeRules, runExcludeRuleLt645, saveExcludeRules, generateExcludedRules } from "../../api/client";
 import type { ExcludeRule } from "../../types";
 import type { MenuProps } from "./types";
 
@@ -114,6 +114,15 @@ export default function Menu6ManageExcluded({ runTask, setLastResponse, setMessa
     });
   };
 
+  // 제외목록생성
+  const handleGenerateExcluded = () => {
+    runTask(async () => {
+      const result = await generateExcludedRules(excludeRules);
+      setMessage(`${result.message}. (Saved ${result.count} rules)`);
+      await loadExcludeRules();
+    });
+  };
+
   return (
     <section className="panel">
       <div style={{ fontSize: "0.8rem", color: "var(--fg-muted)", fontFamily: "monospace", marginBottom: "0.5rem" }}>
@@ -145,6 +154,17 @@ export default function Menu6ManageExcluded({ runTask, setLastResponse, setMessa
           }}
         >
           Add Rule
+        </button>
+        <button
+          type="button"
+          onClick={handleGenerateExcluded}
+          style={{
+            background: "var(--success-emphasis)",
+            color: "#ffffff",
+            border: "1px solid rgba(0,0,0,0.1)"
+          }}
+        >
+          Generate
         </button>
         <button
           type="button"

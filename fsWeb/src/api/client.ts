@@ -97,6 +97,13 @@ export async function saveExcludeRules(rules: ExcludeRule[]): Promise<{ message:
   });
 }
 
+export async function generateExcludedRules(rules: ExcludeRule[]): Promise<{ message: string; count: number }> {
+  return request<{ message: string; count: number }>("/api/lt645/exclude-rules/generate", {
+    method: "POST",
+    body: JSON.stringify({ rules })
+  });
+}
+
 export async function runExcludeRuleLt645(functionName: string): Promise<{
   function_name: string;
   excluded_count: number;
@@ -107,8 +114,6 @@ export async function runExcludeRuleLt645(functionName: string): Promise<{
     body: JSON.stringify({ function_name: functionName })
   });
 }
-
-
 
 export async function generateMyCombinations(count: number): Promise<{ combinations: number[][]; saved_file: string }> {
   return request<{ combinations: number[][]; saved_file: string }>("/api/lt645/generate", {

@@ -369,6 +369,55 @@ def save_exclude_rules(body: SaveExcludeRulesRequest):
 
     return {"message": "Exclude rules saved successfully", "count": len(body.rules)}
 
+@app.post("/api/lt645/exclude-rules/generate")
+def generate_exclude_rules(body: SaveExcludeRulesRequest):
+    """Generate exclude rules based on the provided rules and save to db/excluded_combinations.csv."""
+    import csv
+    from datetime import datetime
+
+    # 제외목록에서 is_active가 "Y"인 규칙들만으로 제외 숫자를 생성하여 저장
+    active_rules = [rule for rule in body.rules if rule.is_active.upper() == "Y"]
+    if not active_rules:
+        raise HTTPException(status_code=422, detail="No active rules provided for generation")
+    else:
+        print(f"Generating exclude combinations based on {len(active_rules)} active rules.")
+
+    # active_rules에서 function_name을 추출하여 my_combinations 모듈의 run_exclude_rule_on_results 함수를 호출하여 제외 조합을 생성
+    
+    from my_combinations import run_exclude_rule_on_results
+
+    generated_combos = []
+    for rule in active_rules:
+        function_name = rule.function_name
+        excluded = run_exclude_rule_on_results(function_name)
+        for combo in excluded:
+            generated_combos.append({
+                "function_name": function_name,
+                "No1": combo["numbers"][0],
+                "No2": combo["numbers"][1],
+                "No3": combo["numbers"][2],
+                "No4": combo["numbers"][3],
+                "No5": combo["numbers"][4],
+                "No6": combo["numbers"][5],
+            })
+    generated_count = len(generated_combos)
+
+    # Save the provided rules to the CSV file
+    path = DB_EXCLUDED_COMBINATIONS_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    
+    fieldnames = ["function_name", "No1", "No2", "No3", "No4", "No5", "No6"]
+    
+    try:
+        with path.open("w", encoding="utf-8", newline="") as csv_file:
+            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+            writer.writeheader()
+            for combo in generated_combos:
+                writer.writerow(combo)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to write to file: {str(exc)}")
+
+    return {"message": f"Generated {generated_count} exclude rules based on provided rules.", "count": generated_count}
 
 @app.post("/api/lt645/exclude-rules/run")
 def run_exclude_rule(body: dict):

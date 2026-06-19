@@ -216,14 +216,30 @@ def generate_my_number_combinations(count: int) -> list[tuple[int, ...]]:
     # 제외 목록과 활성화된 제외 규칙을 반영해 중복 없는 번호 조합을 원하는 개수만큼 생성한다.
     if count <= 0:
         raise ValueError("count must be a positive integer")
+    
+    print (f"generate_my_number_combinations > Generating {count} unique combinations...")
 
     # 제외 조합을 로드한다.
     # load_excluded_combinations()는 lt645/db/excluded_combinations.csv 파일을 읽어 정렬된 6개 번호 튜플 집합으로 반환한다.
     excluded = load_excluded_combinations()
 
+    # excluded 집합에서 상위 5개만 출력 (디버그용)
+    if excluded:
+        print("Excluded combinations (showing up to 5):")
+        for index, combo in enumerate(sorted(excluded), start=1):
+            if index > 5:
+                break
+            print(f"{index:>3}. {_format_combination(combo)}")
+
     # 활성화된 제외 규칙(is_active == 'Y')에 해당하는 함수들을 로드한다.
     # _load_active_exclude_rule_functions()는 lt645/db/exclude_rules.csv 파일을 읽어 is_active == 'Y'인 규칙의 함수들을 반환한다.
     active_rule_funcs = _load_active_exclude_rule_functions()
+
+    if active_rule_funcs:
+        print("Active exclusion rules:")
+        for func in active_rule_funcs:
+            print(f"- {func.__name__}")
+
     generated: set[tuple[int, ...]] = set()
 
     # 45C6 = 8,145,060
@@ -296,9 +312,6 @@ Even numbers are not allowed in the lottery.
 """
 def exclude_all_evens(combo: tuple[int, ...]) -> bool:
     """Returns True if all numbers in the combination are even."""
-
-    print("Apply exclude_all_evens")
-
     return all(n % 2 == 0 for n in combo)
 
 
@@ -308,8 +321,6 @@ Sequential numbers are not allowed in the lottery.
 """
 def exclude_sequential(combo: tuple[int, ...]) -> bool:
     """Returns True if there are 3 or more consecutive numbers."""
-
-    print("Apply exclude_sequential")
 
     s = sorted(combo)
     for i in range(len(s) - 2):
@@ -325,8 +336,6 @@ def exclude_matching_numbers(combo: tuple[int, ...]) -> bool:
     """
     Returns True if the combination matches any draw result in db/result.csv.
     """
-
-    print("Apply exclude_matching_numbers")
 
     from common import read_csv_rows
     rows = read_csv_rows()
@@ -357,6 +366,7 @@ def run_exclude_rule_on_results(function_name: str) -> list[dict]:
         "exclude_all_odds": exclude_all_odds,
         "exclude_all_evens": exclude_all_evens,
         "exclude_sequential": exclude_sequential,
+        "exclude_matching_numbers": exclude_matching_numbers,
     }
     
     func = func_map.get(function_name)
