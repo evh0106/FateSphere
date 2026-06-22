@@ -260,7 +260,9 @@ def generate_my_number_combinations(count: int) -> list[tuple[int, ...]]:
     if len(generated) < count:
         raise RuntimeError("Could not generate enough unique combinations")
 
-    return sorted(generated)
+    res = list(generated)
+    random.shuffle(res)
+    return res
 
 
 def run_generate_my_number_combinations() -> None:

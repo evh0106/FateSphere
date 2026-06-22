@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { deleteGeneratedFiles, generateMyCombinations, getGeneratedFiles } from "../../api/client";
+import { deleteGeneratedFiles, generateMyCombinations, getGeneratedFiles, getGeneratedFileContent, generateFate, getFateFileContent } from "../../api/client";
 import type { MenuProps } from "./types";
 
 const sourceFilePath = __SOURCE_FILE_PATH__;
 
 interface GeneratedFileRow {
   file_name: string;
+  fate_file: string | null;
 }
 
 export default function Menu9GenerateCombinations({ runTask, setLastResponse, setMessage }: MenuProps) {
@@ -14,6 +15,16 @@ export default function Menu9GenerateCombinations({ runTask, setLastResponse, se
   const [savedFile, setSavedFile] = useState<string>("");
   const [fileRows, setFileRows] = useState<GeneratedFileRow[]>([]);
   const [checkedRows, setCheckedRows] = useState<Record<number, boolean>>({});
+  
+  // Custom Modal States for Fate Number Generation
+  const [isFateModalOpen, setIsFateModalOpen] = useState(false);
+  const [fateCount, setFateCount] = useState("5");
+  const [selectedFileForFate, setSelectedFileForFate] = useState("");
+
+  // Custom Modal States for Viewing Fate Numbers
+  const [isFateViewModalOpen, setIsFateViewModalOpen] = useState(false);
+  const [viewingFateFile, setViewingFateFile] = useState("");
+  const [fateFileRows, setFateFileRows] = useState<number[][]>([]);
 
   const hasCheckedFiles = Object.values(checkedRows).some(Boolean);
 
@@ -61,6 +72,66 @@ export default function Menu9GenerateCombinations({ runTask, setLastResponse, se
       await loadGeneratedFiles();
     });
   }
+
+  function handleFileClick(fileName: string) {
+    runTask(async () => {
+      const data = await getGeneratedFileContent(fileName);
+      setGeneratedRows(data.combinations);
+      setSavedFile(fileName);
+      setLastResponse(data);
+      setMessage(`Loaded ${data.combinations.length} combinations from ${fileName}.`);
+    });
+  }
+
+  function handleFateFileClick(fileName: string) {
+    runTask(async () => {
+      const data = await getFateFileContent(fileName);
+      setFateFileRows(data.combinations);
+      setViewingFateFile(fileName);
+      setIsFateViewModalOpen(true);
+      setMessage(`Loaded ${data.combinations.length} combinations from fate/${fileName}.`);
+    });
+  }
+
+  function handleGenerateFate() {
+    const checkedIndexes = Object.entries(checkedRows)
+      .filter(([_, checked]) => checked)
+      .map(([idx]) => Number(idx));
+
+    if (checkedIndexes.length !== 1) {
+      window.alert("Please select exactly one file to generate Fate numbers.");
+      return;
+    }
+
+    const fileRow = fileRows[checkedIndexes[0]];
+    setSelectedFileForFate(fileRow.file_name);
+    setFateCount("5"); // default value
+    setIsFateModalOpen(true);
+  }
+
+  function submitGenerateFate() {
+    const count = Number(fateCount);
+    if (!Number.isInteger(count) || count <= 0) {
+      window.alert("Count must be a positive integer.");
+      return;
+    }
+
+    runTask(async () => {
+      const res = await generateFate(selectedFileForFate, count);
+      setFateFileRows(res.combinations);
+      setViewingFateFile(res.fate_file);
+      setSavedFile(res.fate_file);
+      setLastResponse(res);
+      setMessage(`Generated ${res.combinations.length} Fate numbers. Saved to fate/${res.fate_file}`);
+      setIsFateModalOpen(false);
+      setFateCount("");
+      setSelectedFileForFate("");
+      setIsFateViewModalOpen(true);
+      await loadGeneratedFiles();
+    });
+  }
+
+
 
   function renderGeneratedTable() {
     if (generatedRows.length === 0) {
@@ -155,6 +226,15 @@ export default function Menu9GenerateCombinations({ runTask, setLastResponse, se
         >
           Delete
         </button>
+        <button
+          type="button"
+          className="secondary"
+          disabled={!hasCheckedFiles}
+          onClick={handleGenerateFate}
+          style={{ marginLeft: "0.5rem" }}
+        >
+          Generate Fate
+        </button>
       </div>
 
       <div style={{ overflowX: "auto" }}>
@@ -164,12 +244,13 @@ export default function Menu9GenerateCombinations({ runTask, setLastResponse, se
               <th style={{ width: "40px", textAlign: "center" }}>check</th>
               <th style={{ width: "60px" }}>no</th>
               <th>file_name</th>
+              <th>fate_number</th>
             </tr>
           </thead>
           <tbody>
             {fileRows.length === 0 ? (
               <tr>
-                <td colSpan={3} style={{ textAlign: "center", color: "var(--fg-muted)", padding: "1.5rem" }}>
+                <td colSpan={4} style={{ textAlign: "center", color: "var(--fg-muted)", padding: "1.5rem" }}>
                   No generated files in lt645/db/gn.
                 </td>
               </tr>
@@ -185,7 +266,24 @@ export default function Menu9GenerateCombinations({ runTask, setLastResponse, se
                     />
                   </td>
                   <td>{index + 1}</td>
-                  <td style={{ fontFamily: "monospace" }}>{row.file_name}</td>
+                  <td
+                    style={{ fontFamily: "monospace", cursor: "pointer", textDecoration: "underline", color: "var(--accent-fg)" }}
+                    onClick={() => handleFileClick(row.file_name)}
+                  >
+                    {row.file_name}
+                  </td>
+                  <td style={{ fontFamily: "monospace" }}>
+                    {row.fate_file ? (
+                      <span
+                        style={{ cursor: "pointer", textDecoration: "underline", color: "var(--accent-fg)" }}
+                        onClick={() => handleFateFileClick(row.fate_file!)}
+                      >
+                        {row.fate_file}
+                      </span>
+                    ) : (
+                      <span className="muted">-</span>
+                    )}
+                  </td>
                 </tr>
               ))
             )}
@@ -196,8 +294,114 @@ export default function Menu9GenerateCombinations({ runTask, setLastResponse, se
       {renderGeneratedTable()}
       {savedFile && (
         <p style={{ fontSize: "0.85rem", color: "var(--fg-muted)", marginTop: "0.5rem" }}>
-          💾 Saved to: <code style={{ color: "var(--fg-default)" }}>lt645/db/gn/{savedFile}</code>
+          💾 Saved to: <code style={{ color: "var(--fg-default)" }}>
+            {savedFile.startsWith("fate_") ? `lt645/db/fate/${savedFile}` : `lt645/db/gn/${savedFile}`}
+          </code>
         </p>
+      )}
+
+      {isFateModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsFateModalOpen(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 600 }}>Generate Fate Numbers</h3>
+            <p className="muted" style={{ margin: "-0.5rem 0 0.5rem" }}>
+              Source: <code>{selectedFileForFate}</code>
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem" }}>
+              <label style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+                <span>Count</span>
+                <input
+                  type="text"
+                  placeholder="e.g. 5"
+                  value={fateCount}
+                  onChange={(e) => setFateCount(e.target.value)}
+                  style={{ width: "100%" }}
+                />
+              </label>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "1.5rem" }}>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  setIsFateModalOpen(false);
+                  setFateCount("");
+                  setSelectedFileForFate("");
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitGenerateFate}
+                style={{
+                  background: "var(--accent-emphasis)",
+                  color: "#ffffff",
+                  border: "1px solid rgba(0,0,0,0.1)"
+                }}
+              >
+                Generate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isFateViewModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsFateViewModalOpen(false)}>
+          <div className="modal-content" style={{ maxWidth: "500px", maxHeight: "80vh" }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 600 }}>Fate Numbers</h3>
+            <p className="muted" style={{ margin: "-0.5rem 0 0.5rem" }}>
+              File: <code>fate/{viewingFateFile}</code>
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem", overflow: "hidden", marginTop: "1rem" }}>
+              <div style={{ overflowY: "auto", maxHeight: "300px", border: "1px solid var(--border-muted)", borderRadius: "6px" }}>
+                <table className="data-table" style={{ margin: 0, border: "none" }}>
+                  <thead>
+                    <tr>
+                      <th>No</th>
+                      <th>No1</th>
+                      <th>No2</th>
+                      <th>No3</th>
+                      <th>No4</th>
+                      <th>No5</th>
+                      <th>No6</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fateFileRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} style={{ textAlign: "center", color: "var(--fg-muted)", padding: "1rem" }}>
+                          No numbers found in this fate file.
+                        </td>
+                      </tr>
+                    ) : (
+                      fateFileRows.map((combo, index) => (
+                        <tr key={`${combo.join("-")}-${index}`}>
+                          <td>{index + 1}</td>
+                          {combo.map((num, i) => (
+                            <td key={i}>{String(num).padStart(2, "0")}</td>
+                          ))}
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1.5rem" }}>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setIsFateViewModalOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </section>
   );

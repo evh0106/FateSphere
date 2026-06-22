@@ -20,7 +20,7 @@ from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from common import DB_GN_PATH, DB_RESULT_PATH, DB_EXCLUDED_COMBINATIONS_PATH, DB_EXCLUDE_RULES_PATH, read_csv_rows
+from common import DB_GN_PATH, DB_FATE_PATH, DB_RESULT_PATH, DB_EXCLUDED_COMBINATIONS_PATH, DB_EXCLUDE_RULES_PATH, read_csv_rows
 from convert_results import convert_result_md_to_csv
 from crawl_results import crawl_new_results, crawl_results_in_range
 from my_combinations import (
@@ -110,6 +110,11 @@ class GenerateRequest(BaseModel):
 
 class DeleteGeneratedFilesRequest(BaseModel):
     file_names: list[str] = Field(min_length=1)
+
+
+class GenerateFateRequest(BaseModel):
+    file_name: str
+    count: int = Field(gt=0)
 
 
 class AddExcludeRuleRequest(BaseModel):
@@ -508,13 +513,156 @@ def _validate_gn_filename(file_name: str) -> str:
 
 @app.get("/api/lt645/generated-files")
 def list_generated_files():
-    """Return CSV file names from db/gn, newest first."""
+    """Return CSV file names from db/gn, newest first, with associated fate_file if it exists."""
     DB_GN_PATH.mkdir(parents=True, exist_ok=True)
+    DB_FATE_PATH.mkdir(parents=True, exist_ok=True)
     files = sorted(
         (path.name for path in DB_GN_PATH.glob("*.csv") if path.is_file()),
         reverse=True,
     )
-    return {"rows": [{"file_name": name} for name in files]}
+    rows = []
+    for name in files:
+        timestamp = ""
+        if name.startswith("generate_number_") and name.endswith(".csv"):
+            timestamp = name[len("generate_number_"):-4]
+        
+        fate_name = f"fate_number_{timestamp}.csv" if timestamp else ""
+        fate_exists = False
+        if fate_name and (DB_FATE_PATH / fate_name).is_file():
+            fate_exists = True
+            
+        rows.append({
+            "file_name": name,
+            "fate_file": fate_name if fate_exists else None
+        })
+    return {"rows": rows}
+
+
+@app.post("/api/lt645/generate-fate")
+def generate_fate(body: GenerateFateRequest):
+    """Generate fate numbers from a specific generated file."""
+    import csv
+    import random
+    
+    name = _validate_gn_filename(body.file_name)
+    filepath = DB_GN_PATH / name
+    if not filepath.is_file():
+        raise HTTPException(status_code=404, detail=f"File not found: {name}")
+        
+    combinations = []
+    with filepath.open("r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            try:
+                combo = [
+                    int(row["No1"]),
+                    int(row["No2"]),
+                    int(row["No3"]),
+                    int(row["No4"]),
+                    int(row["No5"]),
+                    int(row["No6"]),
+                ]
+                combinations.append(combo)
+            except (ValueError, KeyError):
+                continue
+                
+    if not combinations:
+        raise HTTPException(status_code=422, detail="No valid combinations in the file.")
+        
+    if body.count <= 0:
+        raise HTTPException(status_code=422, detail="Count must be a positive integer.")
+        
+    if body.count > len(combinations):
+        raise HTTPException(status_code=422, detail=f"Requested count ({body.count}) exceeds available combinations ({len(combinations)}).")
+        
+    fate_combinations = random.sample(combinations, body.count)
+    
+    timestamp = ""
+    if name.startswith("generate_number_") and name.endswith(".csv"):
+        timestamp = name[len("generate_number_"):-4]
+    if not timestamp:
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+    fate_filename = f"fate_number_{timestamp}.csv"
+    DB_FATE_PATH.mkdir(parents=True, exist_ok=True)
+    fate_filepath = DB_FATE_PATH / fate_filename
+    
+    fieldnames = ["No", "No1", "No2", "No3", "No4", "No5", "No6"]
+    with fate_filepath.open("w", encoding="utf-8", newline="") as csv_file:
+        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+        writer.writeheader()
+        for idx, combo in enumerate(fate_combinations, start=1):
+            writer.writerow({
+                "No": idx,
+                "No1": combo[0],
+                "No2": combo[1],
+                "No3": combo[2],
+                "No4": combo[3],
+                "No5": combo[4],
+                "No6": combo[5],
+            })
+            
+    return {"fate_file": fate_filename, "combinations": fate_combinations}
+
+
+@app.get("/api/lt645/fate-files/{file_name}")
+def get_fate_file(file_name: str):
+    """Return the contents of a fate CSV file."""
+    import csv
+    name = Path(file_name).name
+    if not name or name != file_name or ".." in file_name or not name.endswith(".csv"):
+        raise HTTPException(status_code=422, detail=f"Invalid file name: {file_name}")
+        
+    filepath = DB_FATE_PATH / name
+    if not filepath.is_file():
+        raise HTTPException(status_code=404, detail=f"File not found: {name}")
+
+    combinations = []
+    with filepath.open("r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            try:
+                combo = [
+                    int(row["No1"]),
+                    int(row["No2"]),
+                    int(row["No3"]),
+                    int(row["No4"]),
+                    int(row["No5"]),
+                    int(row["No6"]),
+                ]
+                combinations.append(combo)
+            except (ValueError, KeyError):
+                continue
+    return {"combinations": combinations}
+
+
+@app.get("/api/lt645/generated-files/{file_name}")
+def get_generated_file(file_name: str):
+    """Return the contents of a generated CSV file."""
+    import csv
+    name = _validate_gn_filename(file_name)
+    filepath = DB_GN_PATH / name
+    if not filepath.is_file():
+        raise HTTPException(status_code=404, detail=f"File not found: {name}")
+
+    combinations = []
+    with filepath.open("r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            try:
+                combo = [
+                    int(row["No1"]),
+                    int(row["No2"]),
+                    int(row["No3"]),
+                    int(row["No4"]),
+                    int(row["No5"]),
+                    int(row["No6"]),
+                ]
+                combinations.append(combo)
+            except (ValueError, KeyError):
+                continue
+    return {"combinations": combinations}
 
 
 @app.delete("/api/lt645/generated-files")

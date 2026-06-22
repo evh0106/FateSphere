@@ -11,6 +11,7 @@ DB_RESULT_PATH = PROJECT_ROOT / "db" / "result.csv"
 DB_EXCLUDED_COMBINATIONS_PATH = PROJECT_ROOT / "db" / "excluded_combinations.csv"
 DB_EXCLUDE_RULES_PATH = PROJECT_ROOT / "db" / "exclude_rules.csv"
 DB_GN_PATH = PROJECT_ROOT / "db" / "gn"
+DB_FATE_PATH = PROJECT_ROOT / "db" / "fate"
 
 
 

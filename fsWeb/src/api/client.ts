@@ -126,6 +126,21 @@ export async function getGeneratedFiles(): Promise<{ rows: Array<{ file_name: st
   return request<{ rows: Array<{ file_name: string }> }>("/api/lt645/generated-files");
 }
 
+export async function getGeneratedFileContent(fileName: string): Promise<{ combinations: number[][] }> {
+  return request<{ combinations: number[][] }>(`/api/lt645/generated-files/${encodeURIComponent(fileName)}`);
+}
+
+export async function generateFate(fileName: string, count: number): Promise<{ fate_file: string; combinations: number[][] }> {
+  return request<{ fate_file: string; combinations: number[][] }>("/api/lt645/generate-fate", {
+    method: "POST",
+    body: JSON.stringify({ file_name: fileName, count })
+  });
+}
+
+export async function getFateFileContent(fileName: string): Promise<{ combinations: number[][] }> {
+  return request<{ combinations: number[][] }>(`/api/lt645/fate-files/${encodeURIComponent(fileName)}`);
+}
+
 export async function deleteGeneratedFiles(fileNames: string[]): Promise<{ deleted: string[]; errors: string[] }> {
   return request<{ deleted: string[]; errors: string[] }>("/api/lt645/generated-files", {
     method: "DELETE",
