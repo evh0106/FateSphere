@@ -6,6 +6,15 @@ import type { MenuProps } from "./types";
 
 const sourceFilePath = __SOURCE_FILE_PATH__;
 
+function getNumberColor(num: number): string {
+  if (num >= 1 && num <= 10) return "#e08f00";
+  if (num >= 11 && num <= 20) return "#0063cc";
+  if (num >= 21 && num <= 30) return "#d8314f";
+  if (num >= 31 && num <= 40) return "#6e7382";
+  if (num >= 41 && num <= 45) return "#2c9e44";
+  return "inherit";
+}
+
 export default function Menu5ShowResults({ runTask, setLastResponse, setMessage }: MenuProps) {
   const [showStartRound, setShowStartRound] = useState("");
   const [showEndRound, setShowEndRound] = useState("");
@@ -31,8 +40,25 @@ export default function Menu5ShowResults({ runTask, setLastResponse, setMessage 
             <tr key={row.round}>
               <td>{row.round}</td>
               <td>{row.draw_date ?? "-"}</td>
-              <td>{formatNumbers([row.n1, row.n2, row.n3, row.n4, row.n5, row.n6])}</td>
-              <td>{String(row.bonus).padStart(2, "0")}</td>
+              <td>
+                {[row.n1, row.n2, row.n3, row.n4, row.n5, row.n6].map((num, idx) => (
+                  <span
+                    key={idx}
+                    style={{
+                      color: getNumberColor(num),
+                      fontWeight: "bold",
+                      marginRight: idx < 5 ? "8px" : "0",
+                    }}
+                  >
+                    {String(num).padStart(2, "0")}
+                  </span>
+                ))}
+              </td>
+              <td>
+                <span style={{ color: getNumberColor(row.bonus), fontWeight: "bold" }}>
+                  {String(row.bonus).padStart(2, "0")}
+                </span>
+              </td>
             </tr>
           ))}
         </tbody>

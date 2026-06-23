@@ -122,8 +122,8 @@ export async function generateMyCombinations(count: number): Promise<{ combinati
   });
 }
 
-export async function getGeneratedFiles(): Promise<{ rows: Array<{ file_name: string }> }> {
-  return request<{ rows: Array<{ file_name: string }> }>("/api/lt645/generated-files");
+export async function getGeneratedFiles(): Promise<{ rows: Array<{ file_name: string; fate_file: string | null }> }> {
+  return request<{ rows: Array<{ file_name: string; fate_file: string | null }> }>("/api/lt645/generated-files");
 }
 
 export async function getGeneratedFileContent(fileName: string): Promise<{ combinations: number[][] }> {

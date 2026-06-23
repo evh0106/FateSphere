@@ -544,11 +544,13 @@ def generate_fate(body: GenerateFateRequest):
     import csv
     import random
     
+    # Validate the file name and ensure it exists
     name = _validate_gn_filename(body.file_name)
     filepath = DB_GN_PATH / name
     if not filepath.is_file():
         raise HTTPException(status_code=404, detail=f"File not found: {name}")
-        
+    
+    # Read the combinations from the specified generated file
     combinations = []
     with filepath.open("r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
@@ -575,8 +577,10 @@ def generate_fate(body: GenerateFateRequest):
     if body.count > len(combinations):
         raise HTTPException(status_code=422, detail=f"Requested count ({body.count}) exceeds available combinations ({len(combinations)}).")
         
+    # Randomly sample the requested number of combinations
     fate_combinations = random.sample(combinations, body.count)
     
+    # Save the fate combinations to a new CSV file in db/fate
     timestamp = ""
     if name.startswith("generate_number_") and name.endswith(".csv"):
         timestamp = name[len("generate_number_"):-4]

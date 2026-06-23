@@ -4,6 +4,15 @@ import type { MenuProps } from "./types";
 
 const sourceFilePath = __SOURCE_FILE_PATH__;
 
+function getNumberColor(num: number): string {
+  if (num >= 1 && num <= 10) return "#e08f00";
+  if (num >= 11 && num <= 20) return "#0063cc";
+  if (num >= 21 && num <= 30) return "#d8314f";
+  if (num >= 31 && num <= 40) return "#6e7382";
+  if (num >= 41 && num <= 45) return "#2c9e44";
+  return "inherit";
+}
+
 interface GeneratedFileRow {
   file_name: string;
   fate_file: string | null;
@@ -157,7 +166,9 @@ export default function Menu9GenerateCombinations({ runTask, setLastResponse, se
               <tr key={`${combo.join("-")}-${index}`}>
                 <td>{index + 1}</td>
                 {combo.map((num, i) => (
-                  <td key={i}>{String(num).padStart(2, "0")}</td>
+                  <td key={i} style={{ color: getNumberColor(num), fontWeight: "bold" }}>
+                    {String(num).padStart(2, "0")}
+                  </td>
                 ))}
               </tr>
             ))}
@@ -381,7 +392,9 @@ export default function Menu9GenerateCombinations({ runTask, setLastResponse, se
                         <tr key={`${combo.join("-")}-${index}`}>
                           <td>{index + 1}</td>
                           {combo.map((num, i) => (
-                            <td key={i}>{String(num).padStart(2, "0")}</td>
+                            <td key={i} style={{ color: getNumberColor(num), fontWeight: "bold" }}>
+                              {String(num).padStart(2, "0")}
+                            </td>
                           ))}
                         </tr>
                       ))
