@@ -26,7 +26,8 @@ npm install
 copy .env.example .env
 ```
 
-Set `VITE_API_BASE_URL` in `.env` if your backend runs on another host/port.
+Set `VITE_API_BASE_URL` in `.env` if the `lt645` backend runs on another host/port.
+Set `VITE_PT720_API_BASE_URL` if the `pt720` backend runs on another host/port.
 
 3. Run development server
 

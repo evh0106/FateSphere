@@ -3,11 +3,31 @@ import type { ProbabilityRow } from "../../types";
 
 const sourceFilePath = __SOURCE_FILE_PATH__;
 
+function buildProbabilityRows(): ProbabilityRow[] {
+  const total = 5000000;
+
+  const rows: Array<{ rank: string; favorable: number }> = [
+    { rank: "1st Prize (7 digits)", favorable: 1 },
+    { rank: "2nd Prize (6 digits)", favorable: 4 },
+    { rank: "3rd Prize (5 digits)", favorable: 45 },
+    { rank: "4th Prize (4 digits)", favorable: 450 },
+    { rank: "5th Prize (3 digits)", favorable: 4500 },
+    { rank: "6th Prize (2 digits)", favorable: 45000 },
+    { rank: "7th Prize (1 digit)", favorable: 450000 },
+    { rank: "Bonus (6 digits)", favorable: 5 }
+  ];
+
+  return rows.map((row) => ({
+    rank: row.rank,
+    favorable: row.favorable,
+    total,
+    probability: row.favorable / total,
+    odds: total / row.favorable
+  }));
+}
+
 export default function Menu1PrizeProbabilities() {
-  const probabilityRows: ProbabilityRow[] = useMemo(() => [
-    { rank: "1st (All Correct)", favorable: 1, total: 5000000, probability: 1/5000000, odds: 5000000 },
-    { rank: "2nd (Same group/number)", favorable: 4, total: 5000000, probability: 4/5000000, odds: 1250000 },
-  ], []);
+  const probabilityRows = useMemo(() => buildProbabilityRows(), []);
 
   return (
     <section className="panel">
@@ -15,7 +35,7 @@ export default function Menu1PrizeProbabilities() {
         {sourceFilePath}
       </div>
       <h2>Prize Probabilities (pt720)</h2>
-      <p className="muted">Equivalent to CLI menu 1: Show prize probabilities (pt720 skeleton).</p>
+      <p className="muted">Equivalent to CLI menu 1: Show prize probabilities (pt720).</p>
       <table className="data-table">
         <thead>
           <tr>

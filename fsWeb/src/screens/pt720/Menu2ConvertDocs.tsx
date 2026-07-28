@@ -1,3 +1,4 @@
+import { convertDocsResultPt720 } from "../../api/client";
 import type { MenuProps } from "../lt645/types";
 
 const sourceFilePath = __SOURCE_FILE_PATH__;
@@ -14,8 +15,9 @@ export default function Menu2ConvertDocs({ runTask, setLastResponse, setMessage 
         type="button"
         onClick={() =>
           runTask(async () => {
-            setLastResponse({ converted: 0 });
-            setMessage(`[Skeleton] Converted 0 rows for pt720.`);
+            const data = await convertDocsResultPt720();
+            setLastResponse(data);
+            setMessage(`Converted ${data.converted} rows.`);
           })
         }
       >

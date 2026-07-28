@@ -9,6 +9,11 @@ def convert_result_md_to_csv(source=DOCS_RESULT_PATH, target=DB_RESULT_PATH) -> 
     rows = parse_markdown_table(source.read_text(encoding="utf-8"))
     target.parent.mkdir(parents=True, exist_ok=True)
 
+    try:
+        rows.sort(key=lambda row: int(row.get("Round", 0)))
+    except ValueError:
+        pass
+
     if not rows:
         target.write_text("", encoding="utf-8")
         return 0

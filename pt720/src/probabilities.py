@@ -7,20 +7,19 @@ def calculate_prize_probabilities() -> list[dict[str, str]]:
     """
     total_tickets = 5000000
     
-    # Favorable cases for each rank
-    prize_counts = {
-        "1st Place": 1,
-        "2nd Place": 4,      # Same 6 digits, different group
-        "3rd Place": 45,     # Last 5 digits match, first digit of number does not match, any group
-        "4th Place": 450,    # Last 4 digits match
-        "5th Place": 4500,   # Last 3 digits match
-        "6th Place": 45000,  # Last 2 digits match
-        "7th Place": 450000, # Last 1 digit matches
-        "Bonus": 5           # Same 6 digits as bonus, any group
-    }
+    prize_counts = [
+        ("1st Prize (7 digits)", 1),
+        ("2nd Prize (6 digits)", 4),
+        ("3rd Prize (5 digits)", 45),
+        ("4th Prize (4 digits)", 450),
+        ("5th Prize (3 digits)", 4500),
+        ("6th Prize (2 digits)", 45000),
+        ("7th Prize (1 digit)", 450000),
+        ("Bonus (6 digits)", 5),
+    ]
 
     results: list[dict[str, str]] = []
-    for place, count in prize_counts.items():
+    for place, count in prize_counts:
         probability = count / total_tickets
         results.append(
             {
