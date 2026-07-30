@@ -13,6 +13,8 @@ if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
 from typing import Optional
+import csv
+from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -112,6 +114,24 @@ class AddExcludedRequest(BaseModel):
 
 class GenerateRequest(BaseModel):
     count: int = Field(default=5, gt=0)
+
+
+class AddExcludeRuleRequest(BaseModel):
+    rule_name: str
+    function_name: str
+
+
+class ExcludeRuleModel(BaseModel):
+    rule_name: str
+    function_name: str
+    start_round: str
+    end_round: str
+    updated_at: str
+    is_active: str
+
+
+class SaveExcludeRulesRequest(BaseModel):
+    rules: list[ExcludeRuleModel]
 
 
 # ---------------------------------------------------------------------------
@@ -242,3 +262,95 @@ def generate(req: GenerateRequest):
     return {
         "combinations": [list(c) for c in combos]
     }
+
+
+@app.post("/api/pt720/exclude-rules", status_code=201)
+def add_exclude_rule(req: AddExcludeRuleRequest):
+    rule_name = req.rule_name.strip()
+    function_name = req.function_name.strip()
+
+    if not rule_name or not function_name:
+        raise HTTPException(status_code=422, detail="Both rule_name and function_name are required")
+
+    path = DB_EXCLUDE_RULES_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    file_exists = path.exists()
+
+    updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    fieldnames = ["rule_name", "function_name", "start_round", "end_round", "updated_at", "is_active"]
+
+    try:
+        with path.open("a", encoding="utf-8", newline="") as csv_file:
+            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow({
+                "rule_name": rule_name,
+                "function_name": function_name,
+                "start_round": "1",
+                "end_round": "",
+                "updated_at": updated_at,
+                "is_active": "Y",
+            })
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to write to file: {str(exc)}") from exc
+
+    return {
+        "message": "Exclude rule saved successfully",
+        "rule_name": rule_name,
+        "function_name": function_name,
+        "start_round": "1",
+        "end_round": "",
+        "updated_at": updated_at,
+        "is_active": "Y",
+    }
+
+
+@app.get("/api/pt720/exclude-rules")
+def list_exclude_rules():
+    path = DB_EXCLUDE_RULES_PATH
+    if not path.exists():
+        return {"rows": []}
+
+    rows = []
+    try:
+        with path.open(encoding="utf-8", newline="") as csv_file:
+            reader = csv.DictReader(csv_file)
+            for row in reader:
+                rows.append({
+                    "rule_name": row.get("rule_name", ""),
+                    "function_name": row.get("function_name", ""),
+                    "start_round": row.get("start_round", "1"),
+                    "end_round": row.get("end_round", ""),
+                    "updated_at": row.get("updated_at", ""),
+                    "is_active": row.get("is_active", "Y"),
+                })
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to read file: {str(exc)}") from exc
+
+    return {"rows": rows}
+
+
+@app.put("/api/pt720/exclude-rules")
+def save_exclude_rules(req: SaveExcludeRulesRequest):
+    path = DB_EXCLUDE_RULES_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    fieldnames = ["rule_name", "function_name", "start_round", "end_round", "updated_at", "is_active"]
+    try:
+        with path.open("w", encoding="utf-8", newline="") as csv_file:
+            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+            writer.writeheader()
+            for rule in req.rules:
+                writer.writerow({
+                    "rule_name": rule.rule_name,
+                    "function_name": rule.function_name,
+                    "start_round": rule.start_round,
+                    "end_round": rule.end_round,
+                    "updated_at": rule.updated_at,
+                    "is_active": rule.is_active,
+                })
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to write to file: {str(exc)}") from exc
+
+    return {"message": "Exclude rules saved successfully", "count": len(req.rules)}

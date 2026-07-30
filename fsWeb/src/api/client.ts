@@ -59,6 +59,62 @@ export async function crawlRangePt720(startRound: number, endRound: number): Pro
   });
 }
 
+export async function getExcludedCombinationsPt720(): Promise<{ rows: ExcludedCombination[] }> {
+  return request<{ rows: ExcludedCombination[] }>(PT720_API_BASE_URL, "/api/pt720/excluded");
+}
+
+export async function addExcludedCombinationPt720(numbers: number[]): Promise<ExcludedCombination> {
+  return request<ExcludedCombination>(PT720_API_BASE_URL, "/api/pt720/excluded", {
+    method: "POST",
+    body: JSON.stringify({ numbers })
+  });
+}
+
+export async function deleteExcludedCombinationPt720(id: string): Promise<void> {
+  return request<void>(PT720_API_BASE_URL, `/api/pt720/excluded/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export async function addExcludeRulePt720(ruleName: string, functionName: string): Promise<{
+  message: string;
+  rule_name: string;
+  function_name: string;
+  start_round: string;
+  end_round: string;
+  updated_at: string;
+  is_active: string;
+}> {
+  return request<{
+    message: string;
+    rule_name: string;
+    function_name: string;
+    start_round: string;
+    end_round: string;
+    updated_at: string;
+    is_active: string;
+  }>(PT720_API_BASE_URL, "/api/pt720/exclude-rules", {
+    method: "POST",
+    body: JSON.stringify({ rule_name: ruleName, function_name: functionName })
+  });
+}
+
+export async function getExcludeRulesPt720(): Promise<{ rows: ExcludeRule[] }> {
+  return request<{ rows: ExcludeRule[] }>(PT720_API_BASE_URL, "/api/pt720/exclude-rules");
+}
+
+export async function saveExcludeRulesPt720(rules: ExcludeRule[]): Promise<{ message: string; count: number }> {
+  return request<{ message: string; count: number }>(PT720_API_BASE_URL, "/api/pt720/exclude-rules", {
+    method: "PUT",
+    body: JSON.stringify({ rules })
+  });
+}
+
+export async function generateMyCombinationsPt720(count: number): Promise<{ combinations: number[][] }> {
+  return request<{ combinations: number[][] }>(PT720_API_BASE_URL, "/api/pt720/generate", {
+    method: "POST",
+    body: JSON.stringify({ count })
+  });
+}
+
 export async function getResults(params?: {
   startRound?: number;
   endRound?: number;

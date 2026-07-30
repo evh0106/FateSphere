@@ -1,55 +1,33 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
+import {
+  addExcludeRulePt720,
+  getExcludeRulesPt720,
+  saveExcludeRulesPt720,
+} from "../../api/client";
 import type { ExcludeRule } from "../../types";
 import type { MenuProps } from "./types";
 
 const sourceFilePath = __SOURCE_FILE_PATH__;
 
-// pt720 전용 스켈레톤 API 모방 클라이언트 로직
-const DUMMY_RULES: ExcludeRule[] = [
-  {
-    rule_name: "임시 제외 규칙 1",
-    function_name: "pt720_exclude_rule_1",
-    start_round: "1",
-    end_round: "",
-    updated_at: "2026-06-15 12:00:00",
-    is_active: "Y"
-  },
-  {
-    rule_name: "임시 제외 규칙 2",
-    function_name: "pt720_exclude_rule_2",
-    start_round: "5",
-    end_round: "10",
-    updated_at: "2026-06-15 12:05:00",
-    is_active: "N"
-  }
-];
-
 export default function Menu6ManageExcludedPt720({ runTask, setLastResponse, setMessage }: MenuProps) {
   const [excludeRules, setExcludeRules] = useState<ExcludeRule[]>([]);
+  const [checkedRows, setCheckedRows] = useState<Record<number, boolean>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [ruleName, setRuleName] = useState("");
   const [functionName, setFunctionName] = useState("");
 
   async function loadExcludeRules() {
-    // 스켈레톤이므로 더미 데이터 로딩 시뮬레이션
-    return new Promise<{ rows: ExcludeRule[] }>((resolve) => {
-      setTimeout(() => {
-        resolve({ rows: [...DUMMY_RULES] });
-      }, 300);
-    });
+    const data = await getExcludeRulesPt720();
+    setExcludeRules(data.rows);
+    setCheckedRows({});
+    setLastResponse(data);
   }
 
-  const reload = () => {
-    runTask(async () => {
-      const data = await loadExcludeRules();
-      setExcludeRules(data.rows);
-      setLastResponse(data);
-      setMessage("Loaded pt720 exclude rules (Skeleton).");
-    });
-  };
-
   useEffect(() => {
-    reload();
+    runTask(async () => {
+      await loadExcludeRules();
+      setMessage("Loaded pt720 exclude rules.");
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -58,24 +36,52 @@ export default function Menu6ManageExcludedPt720({ runTask, setLastResponse, set
       alert("규칙명과 호출 함수 명을 모두 입력해주세요.");
       return;
     }
+
     runTask(async () => {
-      // 로컬 상태 추가만 시뮬레이션
-      const newRule: ExcludeRule = {
-        rule_name: ruleName,
-        function_name: functionName,
-        start_round: "1",
-        end_round: "",
-        updated_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
-        is_active: "Y"
-      };
-      DUMMY_RULES.push(newRule);
-      setMessage(`[Skeleton] 제외 규칙이 추가되었습니다 (서버 저장되지 않음): ${ruleName}`);
+      const result = await addExcludeRulePt720(ruleName, functionName);
+      setMessage(`Exclude rule saved successfully: ${result.rule_name}`);
       setIsModalOpen(false);
       setRuleName("");
       setFunctionName("");
-      const data = await loadExcludeRules();
-      setExcludeRules(data.rows);
-      setLastResponse({ success: true, added: newRule });
+      setLastResponse(result);
+      await loadExcludeRules();
+    });
+  };
+
+  const handleCheckRow = (index: number) => {
+    setCheckedRows((prev) => ({
+      ...prev,
+      [index]: !prev[index]
+    }));
+  };
+
+  const handleFieldChange = (index: number, field: keyof ExcludeRule, value: string) => {
+    const updatedRules = [...excludeRules];
+    updatedRules[index] = { ...updatedRules[index], [field]: value };
+    setExcludeRules(updatedRules);
+  };
+
+  const handleStatusChange = (index: number, newStatus: string) => {
+    handleFieldChange(index, "is_active", newStatus);
+  };
+
+  const editableInputStyle = (isChecked: boolean): CSSProperties => ({
+    width: "100%",
+    padding: "0.2rem 0.4rem",
+    borderRadius: "4px",
+    border: "1px solid var(--border-default)",
+    background: isChecked ? "var(--bg-default)" : "var(--bg-subtle)",
+    color: isChecked ? "var(--fg-default)" : "var(--fg-muted)",
+    cursor: isChecked ? "text" : "not-allowed",
+    fontFamily: "inherit",
+    fontSize: "inherit"
+  });
+
+  const handleSaveAllRules = () => {
+    runTask(async () => {
+      const result = await saveExcludeRulesPt720(excludeRules);
+      setMessage(`${result.message}. (Saved ${result.count} rules)`);
+      await loadExcludeRules();
     });
   };
 
@@ -85,9 +91,21 @@ export default function Menu6ManageExcludedPt720({ runTask, setLastResponse, set
         {sourceFilePath}
       </div>
       <h2>Manage Excluded Number Combinations (pt720)</h2>
-      <p className="muted">Equivalent to CLI menu 6 (pt720 skeleton).</p>
-      
+      <p className="muted">Equivalent to CLI menu 6 (pt720 exclude rules).</p>
+
       <div className="row-actions">
+        <button
+          type="button"
+          className="secondary"
+          onClick={() =>
+            runTask(async () => {
+              await loadExcludeRules();
+              setMessage("Loaded pt720 exclude rules.");
+            })
+          }
+        >
+          Refresh
+        </button>
         <button
           type="button"
           onClick={() => setIsModalOpen(true)}
@@ -97,14 +115,18 @@ export default function Menu6ManageExcludedPt720({ runTask, setLastResponse, set
             border: "1px solid rgba(0,0,0,0.1)"
           }}
         >
-          규칙 추가
+          Add Rule
         </button>
         <button
           type="button"
-          className="secondary"
-          onClick={reload}
+          onClick={handleSaveAllRules}
+          style={{
+            background: "var(--success-emphasis)",
+            color: "#ffffff",
+            border: "1px solid rgba(0,0,0,0.1)"
+          }}
         >
-          Refresh
+          Save
         </button>
       </div>
 
@@ -112,43 +134,89 @@ export default function Menu6ManageExcludedPt720({ runTask, setLastResponse, set
         <table className="data-table">
           <thead>
             <tr>
-              <th>규칙명</th>
-              <th>호출 함수 명</th>
-              <th>적용시작회차</th>
-              <th>적용종료회차</th>
-              <th>수정일자</th>
-              <th>사용여부</th>
+              <th style={{ width: "40px", textAlign: "center" }}>check</th>
+              <th>Rule Name</th>
+              <th>Function Name</th>
+              <th>Start Round</th>
+              <th>End Round</th>
+              <th>Updated At</th>
+              <th>Status</th>
             </tr>
           </thead>
           <tbody>
             {excludeRules.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ textAlign: "center", color: "var(--fg-muted)", padding: "1.5rem" }}>
+                <td colSpan={7} style={{ textAlign: "center", color: "var(--fg-muted)", padding: "1.5rem" }}>
                   등록된 제외 규칙이 없습니다.
                 </td>
               </tr>
             ) : (
               excludeRules.map((item, index) => (
                 <tr key={`${item.rule_name}-${index}`}>
-                  <td style={{ fontWeight: 500 }}>{item.rule_name}</td>
-                  <td><code>{item.function_name}</code></td>
-                  <td>{item.start_round ? `${item.start_round}회차` : "1회차"}</td>
-                  <td>{item.end_round ? `${item.end_round}회차` : "무제한"}</td>
+                  <td style={{ textAlign: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={!!checkedRows[index]}
+                      onChange={() => handleCheckRow(index)}
+                      style={{ cursor: "pointer", width: "16px", height: "16px" }}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="text"
+                      value={item.rule_name}
+                      onChange={(e) => handleFieldChange(index, "rule_name", e.target.value)}
+                      disabled={!checkedRows[index]}
+                      style={{ ...editableInputStyle(!!checkedRows[index]), fontWeight: 500 }}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="text"
+                      value={item.function_name}
+                      onChange={(e) => handleFieldChange(index, "function_name", e.target.value)}
+                      disabled={!checkedRows[index]}
+                      style={{ ...editableInputStyle(!!checkedRows[index]), fontFamily: "monospace" }}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="text"
+                      value={item.start_round}
+                      placeholder="All"
+                      onChange={(e) => handleFieldChange(index, "start_round", e.target.value)}
+                      disabled={!checkedRows[index]}
+                      style={editableInputStyle(!!checkedRows[index])}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="text"
+                      value={item.end_round}
+                      placeholder="All"
+                      onChange={(e) => handleFieldChange(index, "end_round", e.target.value)}
+                      disabled={!checkedRows[index]}
+                      style={editableInputStyle(!!checkedRows[index])}
+                    />
+                  </td>
                   <td style={{ whiteSpace: "nowrap", fontSize: "0.82rem", color: "var(--fg-muted)" }}>{item.updated_at || "-"}</td>
                   <td>
-                    <span
+                    <select
+                      value={item.is_active}
+                      onChange={(e) => handleStatusChange(index, e.target.value)}
+                      disabled={!checkedRows[index]}
                       style={{
-                        display: "inline-block",
-                        padding: "0.1rem 0.4rem",
+                        padding: "0.2rem 0.4rem",
                         borderRadius: "4px",
-                        fontSize: "0.75rem",
-                        fontWeight: "600",
-                        background: item.is_active === "Y" ? "var(--accent-muted)" : "var(--bg-subtle)",
-                        color: item.is_active === "Y" ? "var(--accent-emphasis)" : "var(--fg-muted)"
+                        border: "1px solid var(--border-default)",
+                        background: checkedRows[index] ? "var(--bg-default)" : "var(--bg-subtle)",
+                        color: checkedRows[index] ? "var(--fg-default)" : "var(--fg-muted)",
+                        cursor: checkedRows[index] ? "pointer" : "not-allowed"
                       }}
                     >
-                      {item.is_active === "Y" ? "사용중" : "중지"}
-                    </span>
+                      <option value="Y">사용중</option>
+                      <option value="N">미사용</option>
+                    </select>
                   </td>
                 </tr>
               ))
@@ -166,7 +234,7 @@ export default function Menu6ManageExcludedPt720({ runTask, setLastResponse, set
                 <span>규칙명</span>
                 <input
                   type="text"
-                  placeholder="예: 조/일련번호 특정 규칙 제외"
+                  placeholder="예: 홀수 6개 제외"
                   value={ruleName}
                   onChange={(e) => setRuleName(e.target.value)}
                   style={{ width: "100%" }}
@@ -176,7 +244,7 @@ export default function Menu6ManageExcludedPt720({ runTask, setLastResponse, set
                 <span>호출 함수 명</span>
                 <input
                   type="text"
-                  placeholder="예: exclude_pt720_dummy"
+                  placeholder="예: exclude_all_odds"
                   value={functionName}
                   onChange={(e) => setFunctionName(e.target.value)}
                   style={{ width: "100%" }}
