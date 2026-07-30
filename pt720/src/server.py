@@ -473,7 +473,91 @@ def generate_fate(req: GenerateFateRequest):
     if req.count > len(combinations):
         raise HTTPException(status_code=422, detail=f"Requested count ({req.count}) exceeds available combinations ({len(combinations)}).")
 
-    fate_combinations = random.sample(combinations, req.count)
+    print(f"[pt720][generate-fate] source_file={name}, requested_count={req.count}, available={len(combinations)}")
+
+    # Select fate numbers with a diversity-first strategy so that chosen rows
+    # overlap less by position (Group + 6 digits) as count increases.
+    selected: list[tuple[int, ...]] = []
+    selected_keys: set[tuple[int, ...]] = set()
+
+    group_counts = {g: 0 for g in range(1, 6)}
+    digit_counts: list[dict[int, int]] = [{d: 0 for d in range(10)} for _ in range(6)]
+
+    pool = [tuple(c) for c in combinations]
+    random.shuffle(pool)
+
+    def positional_distance(a: tuple[int, ...], b: tuple[int, ...]) -> int:
+        return sum(1 for x, y in zip(a, b) if x != y)
+
+    def score_candidate(candidate: tuple[int, ...]) -> tuple[int, int, int]:
+        if not selected:
+            min_dist = 7
+        else:
+            min_dist = min(positional_distance(candidate, s) for s in selected)
+
+        group_penalty = group_counts.get(candidate[0], 0)
+        digit_penalty = sum(digit_counts[pos][candidate[pos + 1]] for pos in range(6))
+
+        # Higher tuple is better.
+        return (min_dist, -group_penalty, -digit_penalty)
+
+    while len(selected) < req.count:
+        best = None
+        best_score = None
+
+        for candidate in pool:
+            if candidate in selected_keys:
+                continue
+
+            sc = score_candidate(candidate)
+            if best is None or sc > best_score:
+                best = candidate
+                best_score = sc
+
+        if best is None:
+            break
+
+        selected.append(best)
+        selected_keys.add(best)
+        group_counts[best[0]] += 1
+        for pos in range(6):
+            digit_counts[pos][best[pos + 1]] += 1
+
+        if len(selected) == 1:
+            min_dist_text = "N/A"
+        else:
+            min_dist_text = str(min(positional_distance(best, s) for s in selected[:-1]))
+
+        print(
+            "[pt720][generate-fate] "
+            f"step={len(selected)}/{req.count}, "
+            f"picked={best[0]}조{''.join(str(n) for n in best[1:])}, "
+            f"score={best_score}, min_distance_to_selected={min_dist_text}, "
+            f"group_count_after={group_counts[best[0]]}"
+        )
+
+    fate_combinations = [list(c) for c in selected]
+
+    # Summary logs for distribution quality.
+    if len(selected) >= 2:
+        pairwise_total = 0
+        pairwise_count = 0
+        pairwise_min = 7
+        for i in range(len(selected)):
+            for j in range(i + 1, len(selected)):
+                dist = positional_distance(selected[i], selected[j])
+                pairwise_total += dist
+                pairwise_count += 1
+                if dist < pairwise_min:
+                    pairwise_min = dist
+        pairwise_avg = pairwise_total / pairwise_count if pairwise_count else 0
+        print(
+            "[pt720][generate-fate] "
+            f"distribution_summary: pairwise_min_distance={pairwise_min}, "
+            f"pairwise_avg_distance={pairwise_avg:.3f}, group_counts={group_counts}"
+        )
+    else:
+        print(f"[pt720][generate-fate] distribution_summary: selected_count={len(selected)}, group_counts={group_counts}")
 
     timestamp = ""
     if name.startswith("generate_number_") and name.endswith(".csv"):
@@ -501,6 +585,7 @@ def generate_fate(req: GenerateFateRequest):
                 "No6": combo[6],
             })
 
+    print(f"[pt720][generate-fate] saved_fate_file={fate_filename}, rows={len(fate_combinations)}")
     return {"fate_file": fate_filename, "combinations": fate_combinations}
 
 
