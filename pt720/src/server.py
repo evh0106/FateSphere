@@ -20,7 +20,7 @@ from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from common import DB_RESULT_PATH, DB_EXCLUDED_COMBINATIONS_PATH, DB_EXCLUDE_RULES_PATH, read_csv_rows
+from common import DB_RESULT_PATH, DB_EXCLUDED_COMBINATIONS_PATH, DB_EXCLUDE_RULES_PATH, DB_GN_PATH, DB_FATE_PATH, read_csv_rows
 from convert_results import convert_result_md_to_csv
 from crawl_results import crawl_new_results, crawl_results_in_range
 from my_combinations import (
@@ -55,6 +55,24 @@ def _id_to_combo(combo_id: str) -> tuple[int, ...] | None:
     if len(parts) != 7:
         return None
     return tuple(parts)
+
+
+def _validate_gn_filename(file_name: str) -> str:
+    name = Path(file_name).name
+    if not name or name != file_name or ".." in file_name:
+        raise HTTPException(status_code=422, detail=f"Invalid file name: {file_name}")
+    if not name.endswith(".csv"):
+        raise HTTPException(status_code=422, detail=f"Only CSV files are supported: {file_name}")
+    return name
+
+
+def _validate_fate_filename(file_name: str) -> str:
+    name = Path(file_name).name
+    if not name or name != file_name or ".." in file_name:
+        raise HTTPException(status_code=422, detail=f"Invalid file name: {file_name}")
+    if not name.endswith(".csv"):
+        raise HTTPException(status_code=422, detail=f"Only CSV files are supported: {file_name}")
+    return name
 
 
 # ---------------------------------------------------------------------------
@@ -114,6 +132,15 @@ class AddExcludedRequest(BaseModel):
 
 class GenerateRequest(BaseModel):
     count: int = Field(default=5, gt=0)
+
+
+class DeleteGeneratedFilesRequest(BaseModel):
+    file_names: list[str] = Field(min_length=1)
+
+
+class GenerateFateRequest(BaseModel):
+    file_name: str
+    count: int = Field(gt=0)
 
 
 class AddExcludeRuleRequest(BaseModel):
@@ -252,6 +279,9 @@ def delete_excluded(combo_id: str):
 
 @app.post("/api/pt720/generate")
 def generate(req: GenerateRequest):
+    import csv
+    from datetime import datetime
+
     try:
         combos = generate_my_number_combinations(req.count)
     except ValueError as exc:
@@ -259,9 +289,197 @@ def generate(req: GenerateRequest):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"generate_number_{timestamp}.csv"
+    DB_GN_PATH.mkdir(parents=True, exist_ok=True)
+    filepath = DB_GN_PATH / filename
+
+    fieldnames = ["No", "Group", "No1", "No2", "No3", "No4", "No5", "No6"]
+    with filepath.open("w", encoding="utf-8", newline="") as csv_file:
+        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+        writer.writeheader()
+        for idx, combo in enumerate(combos, start=1):
+            writer.writerow({
+                "No": idx,
+                "Group": combo[0],
+                "No1": combo[1],
+                "No2": combo[2],
+                "No3": combo[3],
+                "No4": combo[4],
+                "No5": combo[5],
+                "No6": combo[6],
+            })
+
     return {
-        "combinations": [list(c) for c in combos]
+        "combinations": [list(c) for c in combos],
+        "saved_file": filename,
     }
+
+
+@app.get("/api/pt720/generated-files")
+def list_generated_files():
+    DB_GN_PATH.mkdir(parents=True, exist_ok=True)
+    DB_FATE_PATH.mkdir(parents=True, exist_ok=True)
+    files = sorted(
+        (path.name for path in DB_GN_PATH.glob("*.csv") if path.is_file()),
+        reverse=True,
+    )
+    rows = []
+    for name in files:
+        timestamp = ""
+        if name.startswith("generate_number_") and name.endswith(".csv"):
+            timestamp = name[len("generate_number_"):-4]
+
+        fate_name = f"fate_number_{timestamp}.csv" if timestamp else ""
+        fate_exists = False
+        if fate_name and (DB_FATE_PATH / fate_name).is_file():
+            fate_exists = True
+
+        rows.append({"file_name": name, "fate_file": fate_name if fate_exists else None})
+    return {"rows": rows}
+
+
+@app.get("/api/pt720/generated-files/{file_name}")
+def get_generated_file(file_name: str):
+    name = _validate_gn_filename(file_name)
+    filepath = DB_GN_PATH / name
+    if not filepath.is_file():
+        raise HTTPException(status_code=404, detail=f"File not found: {name}")
+
+    combinations = []
+    with filepath.open("r", encoding="utf-8", newline="") as csv_file:
+        reader = csv.DictReader(csv_file)
+        for row in reader:
+            try:
+                combo = [
+                    int(row["Group"]),
+                    int(row["No1"]),
+                    int(row["No2"]),
+                    int(row["No3"]),
+                    int(row["No4"]),
+                    int(row["No5"]),
+                    int(row["No6"]),
+                ]
+                combinations.append(combo)
+            except (ValueError, KeyError):
+                continue
+
+    return {"combinations": combinations}
+
+
+@app.post("/api/pt720/generate-fate")
+def generate_fate(req: GenerateFateRequest):
+    import random
+
+    name = _validate_gn_filename(req.file_name)
+    filepath = DB_GN_PATH / name
+    if not filepath.is_file():
+        raise HTTPException(status_code=404, detail=f"File not found: {name}")
+
+    combinations = []
+    with filepath.open("r", encoding="utf-8", newline="") as csv_file:
+        reader = csv.DictReader(csv_file)
+        for row in reader:
+            try:
+                combo = [
+                    int(row["Group"]),
+                    int(row["No1"]),
+                    int(row["No2"]),
+                    int(row["No3"]),
+                    int(row["No4"]),
+                    int(row["No5"]),
+                    int(row["No6"]),
+                ]
+                combinations.append(combo)
+            except (ValueError, KeyError):
+                continue
+
+    if not combinations:
+        raise HTTPException(status_code=422, detail="No valid combinations in the file.")
+
+    if req.count > len(combinations):
+        raise HTTPException(status_code=422, detail=f"Requested count ({req.count}) exceeds available combinations ({len(combinations)}).")
+
+    fate_combinations = random.sample(combinations, req.count)
+
+    timestamp = ""
+    if name.startswith("generate_number_") and name.endswith(".csv"):
+        timestamp = name[len("generate_number_"):-4]
+    if not timestamp:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    fate_filename = f"fate_number_{timestamp}.csv"
+    DB_FATE_PATH.mkdir(parents=True, exist_ok=True)
+    fate_filepath = DB_FATE_PATH / fate_filename
+
+    fieldnames = ["No", "Group", "No1", "No2", "No3", "No4", "No5", "No6"]
+    with fate_filepath.open("w", encoding="utf-8", newline="") as csv_file:
+        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+        writer.writeheader()
+        for idx, combo in enumerate(fate_combinations, start=1):
+            writer.writerow({
+                "No": idx,
+                "Group": combo[0],
+                "No1": combo[1],
+                "No2": combo[2],
+                "No3": combo[3],
+                "No4": combo[4],
+                "No5": combo[5],
+                "No6": combo[6],
+            })
+
+    return {"fate_file": fate_filename, "combinations": fate_combinations}
+
+
+@app.get("/api/pt720/fate-files/{file_name}")
+def get_fate_file(file_name: str):
+    name = _validate_fate_filename(file_name)
+    filepath = DB_FATE_PATH / name
+    if not filepath.is_file():
+        raise HTTPException(status_code=404, detail=f"File not found: {name}")
+
+    combinations = []
+    with filepath.open("r", encoding="utf-8", newline="") as csv_file:
+        reader = csv.DictReader(csv_file)
+        for row in reader:
+            try:
+                combo = [
+                    int(row["Group"]),
+                    int(row["No1"]),
+                    int(row["No2"]),
+                    int(row["No3"]),
+                    int(row["No4"]),
+                    int(row["No5"]),
+                    int(row["No6"]),
+                ]
+                combinations.append(combo)
+            except (ValueError, KeyError):
+                continue
+
+    return {"combinations": combinations}
+
+
+@app.delete("/api/pt720/generated-files")
+def delete_generated_files(req: DeleteGeneratedFilesRequest):
+    deleted: list[str] = []
+    errors: list[str] = []
+
+    for raw_name in req.file_names:
+        file_name = _validate_gn_filename(raw_name)
+        filepath = DB_GN_PATH / file_name
+        if not filepath.is_file():
+            errors.append(f"File not found: {file_name}")
+            continue
+        try:
+            filepath.unlink()
+            deleted.append(file_name)
+        except OSError as exc:
+            errors.append(f"Failed to delete {file_name}: {exc}")
+
+    if not deleted and errors:
+        raise HTTPException(status_code=404, detail="; ".join(errors))
+
+    return {"deleted": deleted, "errors": errors}
 
 
 @app.post("/api/pt720/exclude-rules", status_code=201)
