@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { crawlRangePt720 } from "../../api/client";
 import type { MenuProps } from "./types";
 
 const sourceFilePath = __SOURCE_FILE_PATH__;
@@ -30,8 +31,15 @@ export default function Menu4CrawlRange({ runTask, setLastResponse, setMessage }
           runTask(async () => {
             const start = Number(crawlStartRound);
             const end = Number(crawlEndRound);
-            setLastResponse({ crawled: 0 });
-            setMessage(`[Skeleton] Crawled 0 rows from round ${start} to ${end} for pt720.`);
+            if (!Number.isInteger(start) || !Number.isInteger(end) || start <= 0 || end <= 0) {
+              throw new Error("Round values must be positive integers.");
+            }
+            if (start > end) {
+              throw new Error("Start round must be less than or equal to end round.");
+            }
+            const data = await crawlRangePt720(start, end);
+            setLastResponse(data);
+            setMessage(`Crawled ${data.crawled} rows from round ${start} to ${end}.`);
           })
         }
       >

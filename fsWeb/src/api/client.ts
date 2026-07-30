@@ -52,6 +52,13 @@ export async function crawlRange(startRound: number, endRound: number): Promise<
   });
 }
 
+export async function crawlRangePt720(startRound: number, endRound: number): Promise<{ crawled: number }> {
+  return request<{ crawled: number }>(PT720_API_BASE_URL, "/api/pt720/crawl-range", {
+    method: "POST",
+    body: JSON.stringify({ startRound, endRound })
+  });
+}
+
 export async function getResults(params?: {
   startRound?: number;
   endRound?: number;
