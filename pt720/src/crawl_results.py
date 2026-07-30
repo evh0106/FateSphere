@@ -45,10 +45,11 @@ def _record_to_csv_row(item: dict[str, object]) -> dict[str, str] | None:
         round_no = int(item["psltEpsd"])
         group = str(item["wnBndNo"])
         winning_digits = str(item["wnRnkVl"])
+        bonus_digits = str(item["bnsRnkVl"])
     except (KeyError, TypeError, ValueError):
         return None
 
-    if len(winning_digits) != 6:
+    if len(winning_digits) != 6 or len(bonus_digits) != 6:
         return None
 
     return {
@@ -60,6 +61,12 @@ def _record_to_csv_row(item: dict[str, object]) -> dict[str, str] | None:
         "No4": winning_digits[3],
         "No5": winning_digits[4],
         "No6": winning_digits[5],
+        "BNo1": bonus_digits[0],
+        "BNo2": bonus_digits[1],
+        "BNo3": bonus_digits[2],
+        "BNo4": bonus_digits[3],
+        "BNo5": bonus_digits[4],
+        "BNo6": bonus_digits[5],
     }
 
 def _strip_bonus_columns(row: dict[str, str]) -> dict[str, str]:

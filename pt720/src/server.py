@@ -68,6 +68,7 @@ class ResultRow(BaseModel):
     n4: int
     n5: int
     n6: int
+    bonus: str
 
 
 def _csv_row_to_result(row: dict[str, str]) -> ResultRow | None:
@@ -81,6 +82,16 @@ def _csv_row_to_result(row: dict[str, str]) -> ResultRow | None:
             n4=int(row["No4"]),
             n5=int(row["No5"]),
             n6=int(row["No6"]),
+            bonus="".join(
+                [
+                    row["BNo1"],
+                    row["BNo2"],
+                    row["BNo3"],
+                    row["BNo4"],
+                    row["BNo5"],
+                    row["BNo6"],
+                ]
+            ),
         )
     except (KeyError, ValueError):
         return None

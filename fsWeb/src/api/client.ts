@@ -80,6 +80,39 @@ export async function getResults(params?: {
   return request<{ rows: ResultRow[] }>(API_BASE_URL, `/api/lt645/results${suffix}`);
 }
 
+type Pt720ResultRow = {
+  round: number;
+  group: number;
+  n1: number;
+  n2: number;
+  n3: number;
+  n4: number;
+  n5: number;
+  n6: number;
+  bonus: string;
+};
+
+export async function getResultsPt720(params?: {
+  startRound?: number;
+  endRound?: number;
+  limit?: number;
+}): Promise<{ rows: Pt720ResultRow[] }> {
+  const query = new URLSearchParams();
+
+  if (params?.startRound !== undefined) {
+    query.set("startRound", String(params.startRound));
+  }
+  if (params?.endRound !== undefined) {
+    query.set("endRound", String(params.endRound));
+  }
+  if (params?.limit !== undefined) {
+    query.set("limit", String(params.limit));
+  }
+
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request<{ rows: Pt720ResultRow[] }>(PT720_API_BASE_URL, `/api/pt720/results${suffix}`);
+}
+
 export async function getExcludedCombinations(): Promise<{ rows: ExcludedCombination[] }> {
   return request<{ rows: ExcludedCombination[] }>(API_BASE_URL, "/api/lt645/excluded");
 }
