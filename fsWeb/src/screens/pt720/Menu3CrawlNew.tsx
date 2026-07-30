@@ -1,4 +1,5 @@
-import type { MenuProps } from "../lt645/types";
+import { crawlNewResultsPt720 } from "../../api/client";
+import type { MenuProps } from "./types";
 
 const sourceFilePath = __SOURCE_FILE_PATH__;
 
@@ -14,8 +15,9 @@ export default function Menu3CrawlNew({ runTask, setLastResponse, setMessage }: 
         type="button"
         onClick={() =>
           runTask(async () => {
-            setLastResponse({ crawled: 0 });
-            setMessage(`[Skeleton] Crawled 0 new rows for pt720.`);
+            const data = await crawlNewResultsPt720();
+            setLastResponse(data);
+            setMessage(`Crawled ${data.crawled} new rows.`);
           })
         }
       >

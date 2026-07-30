@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { MenuProps } from "../lt645/types";
+import type { MenuProps } from "./types";
 
 const sourceFilePath = __SOURCE_FILE_PATH__;
 

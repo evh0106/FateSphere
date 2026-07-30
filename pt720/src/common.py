@@ -70,12 +70,6 @@ def write_csv_rows(rows: Iterable[dict[str, str]], path: Path = DB_RESULT_PATH) 
         "No4",
         "No5",
         "No6",
-        "Bonus1",
-        "Bonus2",
-        "Bonus3",
-        "Bonus4",
-        "Bonus5",
-        "Bonus6"
     ]
 
     ordered_known = [key for key in preferred_order if key in seen]

@@ -1,5 +1,5 @@
 import { convertDocsResultPt720 } from "../../api/client";
-import type { MenuProps } from "../lt645/types";
+import type { MenuProps } from "./types";
 
 const sourceFilePath = __SOURCE_FILE_PATH__;
 

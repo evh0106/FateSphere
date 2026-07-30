@@ -41,6 +41,10 @@ export async function crawlNewResults(): Promise<{ crawled: number }> {
   return request<{ crawled: number }>(API_BASE_URL, "/api/lt645/crawl", { method: "POST" });
 }
 
+export async function crawlNewResultsPt720(): Promise<{ crawled: number }> {
+  return request<{ crawled: number }>(PT720_API_BASE_URL, "/api/pt720/crawl", { method: "POST" });
+}
+
 export async function crawlRange(startRound: number, endRound: number): Promise<{ crawled: number }> {
   return request<{ crawled: number }>(API_BASE_URL, "/api/lt645/crawl-range", {
     method: "POST",

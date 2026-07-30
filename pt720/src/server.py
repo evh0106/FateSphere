@@ -68,12 +68,6 @@ class ResultRow(BaseModel):
     n4: int
     n5: int
     n6: int
-    bonus1: int
-    bonus2: int
-    bonus3: int
-    bonus4: int
-    bonus5: int
-    bonus6: int
 
 
 def _csv_row_to_result(row: dict[str, str]) -> ResultRow | None:
@@ -87,12 +81,6 @@ def _csv_row_to_result(row: dict[str, str]) -> ResultRow | None:
             n4=int(row["No4"]),
             n5=int(row["No5"]),
             n6=int(row["No6"]),
-            bonus1=int(row["Bonus1"]),
-            bonus2=int(row["Bonus2"]),
-            bonus3=int(row["Bonus3"]),
-            bonus4=int(row["Bonus4"]),
-            bonus5=int(row["Bonus5"]),
-            bonus6=int(row["Bonus6"]),
         )
     except (KeyError, ValueError):
         return None

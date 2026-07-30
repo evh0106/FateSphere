@@ -1,85 +1,94 @@
 from __future__ import annotations
 
 import json
-import urllib.error
-import urllib.parse
 import urllib.request
-import re
 
 from common import DB_RESULT_PATH, read_csv_rows, write_csv_rows
 
-def fetch_pt720_draw(round_no: int) -> dict[str, str] | None:
-    # URL targeting the Pension Lottery 720+ results page
-    url = f"https://www.dhlottery.co.kr/gameResult.do?method=win720&Round={round_no}"
+PT720_RESULTS_URL = "https://www.dhlottery.co.kr/pt720/selectPstPt720WnList.do"
 
+def _fetch_pt720_result_items() -> list[dict[str, object]] | None:
     request = urllib.request.Request(
-        url,
+        PT720_RESULTS_URL,
         headers={
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "X-Requested-With": "XMLHttpRequest",
+            "Referer": "https://www.dhlottery.co.kr/pt720/result",
         },
     )
 
     try:
         with urllib.request.urlopen(request, timeout=15) as response:
-            html = response.read().decode("utf-8", errors="ignore")
+            payload = json.loads(response.read().decode("utf-8", errors="ignore"))
     except Exception:
         return None
 
-    # Verify if the round in page matches the requested round
-    round_match = re.search(r'id="drwNo720">(\d+)</strong>', html)
-    if not round_match or int(round_match.group(1)) != round_no:
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(data, dict):
         return None
 
-    # Parse 1st prize and bonus prize digits
-    # The numbers are usually listed inside <div class="win720_num"> ... <span>X조</span> ... <span>Y</span>
-    blocks = re.findall(r'<div class="win720_num">.*?</div>\s*</div>', html, re.DOTALL)
-    if len(blocks) < 2:
-        blocks = re.findall(r'<div class="win720_num">.*?</div>', html, re.DOTALL)
+    result = data.get("result")
+    if not isinstance(result, list):
+        return None
 
-    def extract_digits(block_html: str) -> list[str]:
-        spans = re.findall(r'<span>([0-9]조?)</span>', block_html)
-        if not spans:
-            spans = re.findall(r'alt="([0-9]조?)"', block_html)
-        if not spans:
-            spans = re.findall(r'<span[^>]*>\s*([0-9]조?)\s*</span>', block_html)
-        return [s.replace("조", "") for s in spans]
+    items: list[dict[str, object]] = []
+    for item in result:
+        if isinstance(item, dict):
+            items.append(item)
 
-    digits_1st = []
-    digits_bonus = []
+    items.sort(key=lambda item: int(item.get("psltEpsd", 0)), reverse=True)
+    return items
 
-    if len(blocks) >= 2:
-        digits_1st = extract_digits(blocks[0])
-        digits_bonus = extract_digits(blocks[1])
+def _record_to_csv_row(item: dict[str, object]) -> dict[str, str] | None:
+    try:
+        round_no = int(item["psltEpsd"])
+        group = str(item["wnBndNo"])
+        winning_digits = str(item["wnRnkVl"])
+    except (KeyError, TypeError, ValueError):
+        return None
 
-    # Fallback to global image alt search if block parsing failed
-    if len(digits_1st) < 7 or len(digits_bonus) < 6:
-        all_alts = re.findall(r'alt="([0-9]조?)"', html)
-        if len(all_alts) >= 13:
-            digits_1st = all_alts[:7]
-            digits_bonus = all_alts[7:13]
-        else:
-            return None
-
-    group = digits_1st[0].replace("조", "")
-    no_digits = [d.replace("조", "") for d in digits_1st[1:7]]
-    bonus_digits = [d.replace("조", "") for d in digits_bonus[:6]]
+    if len(winning_digits) != 6:
+        return None
 
     return {
         "Round": str(round_no),
         "Group": group,
-        "No1": no_digits[0],
-        "No2": no_digits[1],
-        "No3": no_digits[2],
-        "No4": no_digits[3],
-        "No5": no_digits[4],
-        "No6": no_digits[5],
-        "Bonus1": bonus_digits[0],
-        "Bonus2": bonus_digits[1],
-        "Bonus3": bonus_digits[2],
-        "Bonus4": bonus_digits[3],
-        "Bonus5": bonus_digits[4],
-        "Bonus6": bonus_digits[5]
+        "No1": winning_digits[0],
+        "No2": winning_digits[1],
+        "No3": winning_digits[2],
+        "No4": winning_digits[3],
+        "No5": winning_digits[4],
+        "No6": winning_digits[5],
     }
+
+def _strip_bonus_columns(row: dict[str, str]) -> dict[str, str]:
+    return {
+        key: value
+        for key, value in row.items()
+        if key not in {"Bonus1", "Bonus2", "Bonus3", "Bonus4", "Bonus5", "Bonus6"}
+    }
+
+def fetch_pt720_draw(round_no: int) -> dict[str, str] | None:
+    items = _fetch_pt720_result_items()
+    if items is None:
+        return None
+
+    for item in items:
+        draw = _record_to_csv_row(item)
+        if draw is None:
+            continue
+        if int(draw.get("Round", "0")) == round_no:
+            return draw
+
+    return None
+
+def fetch_latest_pt720_draw() -> dict[str, str] | None:
+    items = _fetch_pt720_result_items()
+    if not items:
+        return None
+
+    return _record_to_csv_row(items[0])
 
 def print_rows_table(rows: list[dict[str, str]]) -> None:
     if not rows:
@@ -109,32 +118,30 @@ def crawl_new_results(csv_path=DB_RESULT_PATH) -> int:
         except ValueError:
             latest_round = 0
 
+    existing_rows = [_strip_bonus_columns(row) for row in existing_rows]
+
+    items = _fetch_pt720_result_items()
+    if items is None:
+        print("No draw data could be parsed from the pt720 result API.")
+        return 0
+
+    latest_item_round = int(items[0].get("psltEpsd", 0))
+    print(f"Latest round on page: {latest_item_round}")
+
     new_rows: list[dict[str, str]] = []
-    next_round = latest_round + 1
-    last_checked_round: int | None = None
-
-    while True:
-        last_checked_round = next_round
-        draw = fetch_pt720_draw(next_round)
+    for item in items:
+        draw = _record_to_csv_row(item)
         if draw is None:
-            break
-        new_rows.append(draw)
-        next_round += 1
+            continue
+        if int(draw.get("Round", "0")) > latest_round:
+            new_rows.append(draw)
 
-    if last_checked_round is not None:
-        print(f"Last crawled target round: {last_checked_round}")
+    new_rows.sort(key=lambda row: int(row.get("Round", 0)))
 
     if not new_rows:
-        previous_draw: dict[str, str] | None = None
-        if last_checked_round is not None and last_checked_round > 1:
-            previous_draw = fetch_pt720_draw(last_checked_round - 1)
-
-        print("No new rows found, but the crawl target was checked.")
-        if previous_draw is not None:
-            print("Previous round data:")
-            print_rows_table([previous_draw])
-        else:
-            print("Previous round data is not available.")
+        print("No new rows found, but the latest result page was checked.")
+        if existing_rows:
+            write_csv_rows(existing_rows, csv_path)
         return 0
 
     print("Crawled rows before saving:")
@@ -150,7 +157,7 @@ def crawl_results_in_range(start_round: int, end_round: int, csv_path=DB_RESULT_
     if start_round > end_round:
         raise ValueError("start_round must be less than or equal to end_round")
 
-    existing_rows = read_csv_rows(csv_path)
+    existing_rows = [_strip_bonus_columns(row) for row in read_csv_rows(csv_path)]
     crawled_rows: list[dict[str, str]] = []
     missing_rounds: list[int] = []
 
