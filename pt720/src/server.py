@@ -24,6 +24,10 @@ from common import DB_RESULT_PATH, DB_EXCLUDED_COMBINATIONS_PATH, DB_EXCLUDE_RUL
 from convert_results import convert_result_md_to_csv
 from crawl_results import crawl_new_results, crawl_results_in_range
 from my_combinations import (
+    exclude_all_evens,
+    exclude_all_odds,
+    exclude_matching_numbers,
+    exclude_sequential,
     generate_my_number_combinations,
     load_excluded_combinations,
     save_excluded_combinations,
@@ -159,6 +163,75 @@ class ExcludeRuleModel(BaseModel):
 
 class SaveExcludeRulesRequest(BaseModel):
     rules: list[ExcludeRuleModel]
+
+
+def _resolve_rule_function(function_name: str):
+    func_map = {
+        "exclude_all_odds": exclude_all_odds,
+        "exclude_all_evens": exclude_all_evens,
+        "exclude_sequential": exclude_sequential,
+        "exclude_matching_numbers": exclude_matching_numbers,
+    }
+    return func_map.get(function_name)
+
+
+def _parse_int_or_default(raw: str, default: int) -> int:
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return default
+
+
+def _collect_from_results(function_name: str, start_round: int, end_round: int) -> list[tuple[int, ...]]:
+    func = _resolve_rule_function(function_name)
+    if not func:
+        raise ValueError(f"Function '{function_name}' is not defined in pt720 rules.")
+
+    rows = read_csv_rows(DB_RESULT_PATH)
+    matched: list[tuple[int, ...]] = []
+
+    for row in rows:
+        try:
+            round_no = int(row.get("Round", "0"))
+            combo = (
+                int(row["Group"]),
+                int(row["No1"]),
+                int(row["No2"]),
+                int(row["No3"]),
+                int(row["No4"]),
+                int(row["No5"]),
+                int(row["No6"]),
+            )
+        except (KeyError, ValueError):
+            continue
+
+        if start_round > 0 and round_no < start_round:
+            continue
+        if end_round > 0 and round_no > end_round:
+            continue
+
+        if func(combo):
+            matched.append(combo)
+
+    return matched
+
+
+def _generate_all_combos_for_rule(function_name: str) -> list[tuple[int, ...]]:
+    # pt720 domain is finite (5 groups * 1,000,000 digit combinations),
+    # so this can enumerate deterministically for no-round rules.
+    func = _resolve_rule_function(function_name)
+    if not func:
+        raise ValueError(f"Function '{function_name}' is not defined in pt720 rules.")
+
+    results: list[tuple[int, ...]] = []
+    for group in range(1, 6):
+        for number in range(0, 1000000):
+            digits = f"{number:06d}"
+            combo = (group,) + tuple(int(ch) for ch in digits)
+            if func(combo):
+                results.append(combo)
+
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -572,3 +645,78 @@ def save_exclude_rules(req: SaveExcludeRulesRequest):
         raise HTTPException(status_code=500, detail=f"Failed to write to file: {str(exc)}") from exc
 
     return {"message": "Exclude rules saved successfully", "count": len(req.rules)}
+
+
+@app.post("/api/pt720/exclude-rules/generate")
+def generate_exclude_rules(req: SaveExcludeRulesRequest):
+    active_rules = [rule for rule in req.rules if rule.is_active.upper() == "Y"]
+    if not active_rules:
+        raise HTTPException(status_code=422, detail="No active rules provided for generation")
+
+    print(f"Generating exclude combinations based on {len(active_rules)} active rules.")
+
+    generated_set: set[tuple[int, ...]] = set()
+
+    filtered_rules = [
+        rule for rule in active_rules
+        if _parse_int_or_default(rule.start_round, 0) >= 1
+    ]
+    if not filtered_rules:
+        raise HTTPException(status_code=422, detail="No active rules with start_round >= 1 provided for generation")
+
+    for rule in filtered_rules:
+        function_name = rule.function_name
+        start_round = _parse_int_or_default(rule.start_round, 0)
+        end_round = _parse_int_or_default(rule.end_round, 0)
+        excluded = _collect_from_results(function_name, start_round, end_round)
+        print(
+            f"run_exclude_rule_on_results '{rule.rule_name}' (function: {function_name}, start_round: {start_round}, end_round: {end_round}) generated {len(excluded)} excluded combinations."
+        )
+        generated_set.update(excluded)
+
+    no_round_rules = [
+        rule for rule in active_rules
+        if _parse_int_or_default(rule.start_round, 0) <= 0 and _parse_int_or_default(rule.end_round, 0) <= 0
+    ]
+    print(f"Generating exclude combinations based on {len(no_round_rules)} rules without start_round and end_round.")
+
+    for rule in no_round_rules:
+        function_name = rule.function_name
+        excluded = _generate_all_combos_for_rule(function_name)
+        print(
+            f"generate_excluded_rules '{rule.rule_name}' (function: {function_name}) generated {len(excluded)} excluded combinations."
+        )
+        generated_set.update(excluded)
+
+    generated_combos = sorted(generated_set)
+    generated_count = len(generated_combos)
+
+    print(f"Total generated exclude combinations: {generated_count}")
+    for index, combo in enumerate(generated_combos[:5], start=1):
+        print(f"{index:>3}. {combo}")
+    if generated_count > 5:
+        print("...")
+        for index, combo in enumerate(generated_combos[-5:], start=generated_count - 4):
+            print(f"{index:>3}. {combo}")
+
+    DB_EXCLUDED_COMBINATIONS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = ["Group", "No1", "No2", "No3", "No4", "No5", "No6"]
+
+    try:
+        with DB_EXCLUDED_COMBINATIONS_PATH.open("w", encoding="utf-8", newline="") as csv_file:
+            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+            writer.writeheader()
+            for combo in generated_combos:
+                writer.writerow({
+                    "Group": combo[0],
+                    "No1": combo[1],
+                    "No2": combo[2],
+                    "No3": combo[3],
+                    "No4": combo[4],
+                    "No5": combo[5],
+                    "No6": combo[6],
+                })
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to write to file: {str(exc)}") from exc
+
+    return {"message": f"Generated {generated_count} exclude rules based on provided rules.", "count": generated_count}

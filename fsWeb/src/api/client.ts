@@ -108,6 +108,13 @@ export async function saveExcludeRulesPt720(rules: ExcludeRule[]): Promise<{ mes
   });
 }
 
+export async function generateExcludedRulesPt720(rules: ExcludeRule[]): Promise<{ message: string; count: number }> {
+  return request<{ message: string; count: number }>(PT720_API_BASE_URL, "/api/pt720/exclude-rules/generate", {
+    method: "POST",
+    body: JSON.stringify({ rules })
+  });
+}
+
 export async function generateMyCombinationsPt720(count: number): Promise<{ combinations: number[][]; saved_file: string }> {
   return request<{ combinations: number[][]; saved_file: string }>(PT720_API_BASE_URL, "/api/pt720/generate", {
     method: "POST",

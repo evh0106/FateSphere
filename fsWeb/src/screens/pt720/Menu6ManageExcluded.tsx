@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import {
   addExcludeRulePt720,
+  generateExcludedRulesPt720,
   getExcludeRulesPt720,
   saveExcludeRulesPt720,
 } from "../../api/client";
@@ -85,6 +86,14 @@ export default function Menu6ManageExcludedPt720({ runTask, setLastResponse, set
     });
   };
 
+  const handleGenerateExcluded = () => {
+    runTask(async () => {
+      const result = await generateExcludedRulesPt720(excludeRules);
+      setMessage(`${result.message}. (Saved ${result.count} rules)`);
+      await loadExcludeRules();
+    });
+  };
+
   return (
     <section className="panel">
       <div style={{ fontSize: "0.8rem", color: "var(--fg-muted)", fontFamily: "monospace", marginBottom: "0.5rem" }}>
@@ -116,6 +125,17 @@ export default function Menu6ManageExcludedPt720({ runTask, setLastResponse, set
           }}
         >
           Add Rule
+        </button>
+        <button
+          type="button"
+          onClick={handleGenerateExcluded}
+          style={{
+            background: "var(--success-emphasis)",
+            color: "#ffffff",
+            border: "1px solid rgba(0,0,0,0.1)"
+          }}
+        >
+          Generate
         </button>
         <button
           type="button"
