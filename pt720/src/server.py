@@ -26,6 +26,7 @@ from crawl_results import crawl_new_results, crawl_results_in_range
 from my_combinations import (
     exclude_all_evens,
     exclude_all_odds,
+    exclude_consecut_identical,
     exclude_matching_numbers,
     exclude_sequential,
     generate_my_number_combinations,
@@ -170,6 +171,7 @@ def _resolve_rule_function(function_name: str):
         "exclude_all_odds": exclude_all_odds,
         "exclude_all_evens": exclude_all_evens,
         "exclude_sequential": exclude_sequential,
+        "exclude_consecut_identical": exclude_consecut_identical,
         "exclude_matching_numbers": exclude_matching_numbers,
     }
     return func_map.get(function_name)
@@ -734,14 +736,20 @@ def save_exclude_rules(req: SaveExcludeRulesRequest):
 
 @app.post("/api/pt720/exclude-rules/generate")
 def generate_exclude_rules(req: SaveExcludeRulesRequest):
+    # 1) 활성화된 규칙만 선택합니다.
+    #    UI에서 체크한 규칙만 여기서 처리되므로, 비활성 규칙은 제외합니다.
     active_rules = [rule for rule in req.rules if rule.is_active.upper() == "Y"]
     if not active_rules:
         raise HTTPException(status_code=422, detail="No active rules provided for generation")
 
     print(f"Generating exclude combinations based on {len(active_rules)} active rules.")
 
+    # 2) 최종적으로 저장할 제외 조합 집합을 준비합니다.
+    #    동일 조합이 여러 규칙에서 중복 생성될 수 있으므로 set으로 누적합니다.
     generated_set: set[tuple[int, ...]] = set()
 
+    # 3) start_round 값이 있는 규칙은 과거 결과 CSV에서 해당 회차 범위를 기준으로 탐색합니다.
+    #    예: 특정 기간 동안 나온 조합만 제외 목록에 추가합니다.
     filtered_rules = [
         rule for rule in active_rules
         if _parse_int_or_default(rule.start_round, 0) >= 1
@@ -753,12 +761,17 @@ def generate_exclude_rules(req: SaveExcludeRulesRequest):
         function_name = rule.function_name
         start_round = _parse_int_or_default(rule.start_round, 0)
         end_round = _parse_int_or_default(rule.end_round, 0)
+
+        # _collect_from_results()는 DB_RESULT_PATH 에서 각 결과 row를 읽고,
+        # 해당 function_name에 연결된 함수 규칙을 적용해 매칭된 조합만 반환합니다.
         excluded = _collect_from_results(function_name, start_round, end_round)
         print(
             f"run_exclude_rule_on_results '{rule.rule_name}' (function: {function_name}, start_round: {start_round}, end_round: {end_round}) generated {len(excluded)} excluded combinations."
         )
         generated_set.update(excluded)
 
+    # 4) start_round/end_round가 비어 있거나 0인 규칙은 전체 조합을 검토하는 규칙입니다.
+    #    예: '모든 홀수 제외', '연속 숫자 제외' 같은 전구간 규칙은 전체 5개 그룹 × 1,000,000 조합을 검사합니다.
     no_round_rules = [
         rule for rule in active_rules
         if _parse_int_or_default(rule.start_round, 0) <= 0 and _parse_int_or_default(rule.end_round, 0) <= 0
@@ -767,15 +780,20 @@ def generate_exclude_rules(req: SaveExcludeRulesRequest):
 
     for rule in no_round_rules:
         function_name = rule.function_name
+
+        # _generate_all_combos_for_rule()은 1~5 그룹의 모든 숫자 조합을 순회하며,
+        # 해당 함수 규칙의 조건을 만족하는 조합을 전부 수집합니다.
         excluded = _generate_all_combos_for_rule(function_name)
         print(
             f"generate_excluded_rules '{rule.rule_name}' (function: {function_name}) generated {len(excluded)} excluded combinations."
         )
         generated_set.update(excluded)
 
+    # 5) 중복 제거 후 정렬하여 CSV에 저장할 순서를 안정적으로 만듭니다.
     generated_combos = sorted(generated_set)
     generated_count = len(generated_combos)
 
+    # 6) 결과 요약 로그를 출력합니다.
     print(f"Total generated exclude combinations: {generated_count}")
     for index, combo in enumerate(generated_combos[:5], start=1):
         print(f"{index:>3}. {combo}")
@@ -784,6 +802,8 @@ def generate_exclude_rules(req: SaveExcludeRulesRequest):
         for index, combo in enumerate(generated_combos[-5:], start=generated_count - 4):
             print(f"{index:>3}. {combo}")
 
+    # 7) 최종 제외 조합 목록을 CSV 파일로 덮어쓰기합니다.
+    #    Group, No1 ... No6 형식으로 저장되며, 이후 generate() 단계에서 같이 사용됩니다.
     DB_EXCLUDED_COMBINATIONS_PATH.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = ["Group", "No1", "No2", "No3", "No4", "No5", "No6"]
 
@@ -804,4 +824,5 @@ def generate_exclude_rules(req: SaveExcludeRulesRequest):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to write to file: {str(exc)}") from exc
 
+    # 8) 마지막으로, 생성된 조합 수와 메시지를 반환합니다.
     return {"message": f"Generated {generated_count} exclude rules based on provided rules.", "count": generated_count}

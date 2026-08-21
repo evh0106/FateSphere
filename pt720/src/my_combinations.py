@@ -171,12 +171,64 @@ def exclude_all_evens(combo: tuple[int, ...]) -> bool:
     return all(digit % 2 == 0 for digit in combo[1:])
 
 def exclude_sequential(combo: tuple[int, ...]) -> bool:
-    # Exclude if there is a sequence of 4 or more identical consecutive digits
-    digits_str = "".join(str(n) for n in combo[1:])
-    for char in "0123456789":
-        if char * 4 in digits_str:
-            return True
+    # Exclude if there is a sequence of 3 or more consecutive digits
+    digits = [int(n) for n in combo[1:]]
+
+    for start in range(len(digits) - 2):
+        for direction in (1, -1):
+            run_length = 1
+            current = digits[start]
+            for index in range(start + 1, len(digits)):
+                next_digit = digits[index]
+                if next_digit == current + direction:
+                    run_length += 1
+                    current = next_digit
+                    if run_length >= 3:
+                        return True
+                else:
+                    break
     return False
+
+
+def exclude_consecut_identical(combo: tuple[int, ...]) -> bool:
+    """
+    연속된 숫자 3개 이상이 포함되면 True를 반환합니다.
+
+    이 함수는 그룹 번호를 제외한 6자리 숫자만 검사합니다.
+    예:
+      - (1, 2, 3, 4, 5, 6) -> 연속 1-2-3-4-5-6 이므로 제외
+      - (9, 8, 7, 6, 5, 4) -> 연속 9-8-7-6-5-4 이므로 제외
+      - (1, 3, 5, 7, 9, 0) -> 모든 숫자가 홀수이거나 서로 연속하지 않으므로 통과
+      - (1, 1, 1, 1, 1, 1) -> 같은 숫자 반복이지만 연속 증가/감소가 아니므로 통과
+
+    동작 방식:
+      1) combo[1:] 에서 실제 6자리 숫자만 추출합니다.
+      2) 각 시작 위치에서 연속 진행 여부를 검사합니다.
+      3) 다음 숫자가 현재 숫자 + 1 이면 오름차순 연속, 현재 숫자 - 1 이면 내림차순 연속으로 봅니다.
+      4) 연속 길이가 3 이상이면 즉시 True를 반환해 제외 대상으로 처리합니다.
+      5) 끝까지 조건을 만족하지 않으면 False를 반환해 허용합니다.
+    """
+    digits = [int(n) for n in combo[1:]]
+
+    # 시작 위치를 하나씩 옮기며, 가장 짧은 연속 구간도 3개 이상인지 판별합니다.
+    for start in range(len(digits) - 2):
+        # 오름차순(1, 2, 3)과 내림차순(9, 8, 7) 둘 다 검사합니다.
+        for direction in (1, -1):
+            run_length = 1
+            current = digits[start]
+
+            # 현재 위치 다음 숫자부터 연속 여부를 확인합니다.
+            for index in range(start + 1, len(digits)):
+                next_digit = digits[index]
+                if next_digit == current + direction:
+                    run_length += 1
+                    current = next_digit
+                    if run_length >= 3:
+                        return True
+                else:
+                    break
+    return False
+
 
 def exclude_matching_numbers(combo: tuple[int, ...]) -> bool:
     # Check if this exact 6 digits matches a past draw's 1st prize digits
@@ -199,6 +251,7 @@ def _load_active_exclude_rule_functions() -> list[callable]:
         "exclude_all_odds": exclude_all_odds,
         "exclude_all_evens": exclude_all_evens,
         "exclude_sequential": exclude_sequential,
+        "exclude_consecut_identical": exclude_consecut_identical,
         "exclude_matching_numbers": exclude_matching_numbers,
     }
 

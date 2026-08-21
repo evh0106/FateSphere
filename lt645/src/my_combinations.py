@@ -306,18 +306,26 @@ def exclude_all_evens(combo: tuple[int, ...]) -> bool:
 
 
 """
-Exclude sequential numbers (e.g. 1,2,3,4,5,6)
+Exclude sequential numbers (e.g. 123, 234, 456, 654)
 Sequential numbers are not allowed in the lottery.
 """
 def exclude_sequential(combo: tuple[int, ...]) -> bool:
-    """Returns True if there are max_consecutive or more consecutive numbers."""
-    max_consecutive = 4
+    """Returns True if there are 3 or more consecutive numbers in order."""
+    digits = list(combo)
 
-    s = sorted(combo)
-    # Check for any sequence of 3 or more consecutive numbers
-    for i in range(len(s) - max_consecutive + 1):
-        if all(s[i + j] == s[i] + j for j in range(max_consecutive)):
-            return True
+    for start in range(len(digits) - 2):
+        for direction in (1, -1):
+            run_length = 1
+            current = digits[start]
+            for index in range(start + 1, len(digits)):
+                next_digit = digits[index]
+                if next_digit == current + direction:
+                    run_length += 1
+                    current = next_digit
+                    if run_length >= 3:
+                        return True
+                else:
+                    break
     return False
 
 
